@@ -21,6 +21,22 @@ describe('toInstant', () => {
     // 2026-03-29 01:30 does not exist in Europe/Lisbon (clocks jump 01:00 -> 02:00)
     expect(toInstant(localDate('2026-03-29'), 90, 'Europe/Lisbon')).toBeNull()
   })
+
+  test('throws on out-of-range minute', () => {
+    expect(() => toInstant(localDate('2026-03-10'), 1440, SP)).toThrow(
+      'Invalid minute: 1440',
+    )
+    expect(() => toInstant(localDate('2026-03-10'), -30, SP)).toThrow(
+      'Invalid minute: -30',
+    )
+  })
+
+  test('resolves ambiguous times (DST backward overlap) to the occurrence after transition', () => {
+    // 2026-10-25 01:30 occurs twice in Europe/Lisbon (clocks fall back 02:00 -> 01:00).
+    // The ambiguous time resolves to the post-transition occurrence (UTC+0).
+    const instant = toInstant(localDate('2026-10-25'), 90, 'Europe/Lisbon')
+    expect(instant?.toISOString()).toBe('2026-10-25T01:30:00.000Z')
+  })
 })
 
 describe('localDateOf', () => {

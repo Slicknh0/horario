@@ -10,19 +10,23 @@ export function localDate(value: string): LocalDate {
 
 function parts(date: LocalDate): [number, number, number] {
   const [y, m, d] = date.split('-').map(Number)
+  // These assertions are safe: every caller passes through the regex-validated localDate() brand.
   return [y as number, m as number, d as number]
 }
 
 /**
  * Converts a wall-clock minute on a local date into a UTC instant.
  * Returns null when that wall-clock time does not exist (DST forward gap).
- * Ambiguous times (DST backward overlap) resolve to the first occurrence.
+ * Ambiguous times (DST backward overlap) resolve to the occurrence after the transition.
  */
 export function toInstant(
   date: LocalDate,
   minute: number,
   timeZone: string,
 ): Date | null {
+  if (!Number.isInteger(minute) || minute < 0 || minute >= 1440) {
+    throw new Error(`Invalid minute: ${minute}`)
+  }
   const [year, month, day] = parts(date)
   const hours = Math.floor(minute / 60)
   const minutes = minute % 60
