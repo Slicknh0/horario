@@ -139,11 +139,17 @@ export type SegmentLayout = DaySegment & {
   laneIndex: number
   laneCount: number
   // Minutes of true, gap-guaranteed clearance before the next appointment
-  // in this same lane starts — `null` when nothing follows it in that
-  // lane. This is what stops a rendering floor (a minimum pixel height for
-  // legibility on a very short appointment) from drawing into where the
-  // next block visually begins: see blockPixelHeights below, which is the
-  // only thing that should ever consume this field.
+  // whose horizontal footprint on screen (`[laneIndex/laneCount,
+  // (laneIndex+1)/laneCount]`) genuinely intersects this one's — `null`
+  // when nothing follows it there. Deliberately NOT "the next occupant of
+  // the same lane NUMBER": lane numbers are renumbered per cluster, so the
+  // same number can mean a different horizontal slice on either side of a
+  // cluster boundary, and a later, wider lane can span what used to be
+  // several narrower ones. This is what stops a rendering floor (a
+  // minimum pixel height for legibility on a very short appointment) from
+  // drawing into where a block that's genuinely below it on screen
+  // begins: see blockPixelHeights below, which is the only thing that
+  // should ever consume this field.
   availableMinutes: number | null
 }
 
@@ -217,26 +223,40 @@ export function layoutDaySegments(
   }
   flushCluster()
 
-  // Second pass: for every lane number, walk its occupants in start order
-  // (already guaranteed by `items` being sorted) and record, on each one,
-  // the gap to the next occupant of that same lane. Deliberately not
-  // scoped to a single cluster — two items can share a lane number across
-  // a cluster boundary, and both still start at the same horizontal edge
-  // on screen, so the gap between them is still the real constraint on how
-  // far the earlier one's rendered height is allowed to reach.
-  const lastInLane = new Map<number, Sortable>()
-  for (const item of items) {
+  // Second pass: for each item (already in start order, from the initial
+  // sort), find the earliest subsequent item whose horizontal footprint on
+  // screen genuinely intersects its own, and record the time gap to it.
+  // This must key on footprint, not lane number: two items can share a
+  // lane number across a cluster boundary while occupying different
+  // horizontal slices (the number was reused, the column wasn't), and two
+  // items can have different lane numbers while genuinely sharing screen
+  // space (a later, single-lane cluster's block spans 0-100% width, so it
+  // overlaps every lane number an earlier, multi-lane cluster used).
+  // Matching on the number alone misses exactly that second case — see the
+  // "B's lane number never recurs" test below, which is the counterexample
+  // that caught it. Two footprints intersect via the same half-open
+  // interval test generateSlots already uses for time
+  // (`aStart < bEnd && bStart < aEnd`), applied to the horizontal axis.
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item) continue
     const layout = result.get(item.id)
     if (!layout) continue
-    const previous = lastInLane.get(layout.laneIndex)
-    if (previous) {
-      const previousLayout = result.get(previous.id)
-      if (previousLayout) {
-        previousLayout.availableMinutes =
-          item.seg.startMinute - previousLayout.startMinute
+    const aStart = layout.laneIndex / layout.laneCount
+    const aEnd = (layout.laneIndex + 1) / layout.laneCount
+
+    for (let j = i + 1; j < items.length; j++) {
+      const other = items[j]
+      if (!other) continue
+      const otherLayout = result.get(other.id)
+      if (!otherLayout) continue
+      const bStart = otherLayout.laneIndex / otherLayout.laneCount
+      const bEnd = (otherLayout.laneIndex + 1) / otherLayout.laneCount
+      if (aStart < bEnd && bStart < aEnd) {
+        layout.availableMinutes = other.seg.startMinute - layout.startMinute
+        break
       }
     }
-    lastInLane.set(layout.laneIndex, item)
   }
 
   return result
@@ -247,11 +267,11 @@ export type BlockPixelHeights = { servicePx: number; bufferPx: number }
 // The rendering floor (a minimum pixel height so a very short appointment
 // is still legible/tappable) is a nicety, never a promise the layout can
 // break: it must never draw past `availableMinutes` — the true, verified
-// gap to the next appointment in the same lane. Without this clamp, a
-// service under the floor's equivalent duration renders taller than it
-// lasts, and because the buffer's fainter extension stacks right after it,
-// the pair can visually run into a same-lane appointment that
-// layoutDaySegments correctly decided does not overlap in time — the
+// gap to the next appointment whose drawn footprint overlaps this one's.
+// Without this clamp, a service under the floor's equivalent duration
+// renders taller than it lasts, and because the buffer's fainter extension
+// stacks right after it, the pair can visually run into an appointment
+// that layoutDaySegments correctly decided does not overlap in time — the
 // algorithm is right and the pixels lie. Shared by both agenda views
 // (which use different pxPerMinute/floor values) rather than duplicated,
 // since this exact geometry mistake is cheap to reintroduce independently

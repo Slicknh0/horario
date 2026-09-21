@@ -157,6 +157,35 @@ describe('layoutDaySegments', () => {
         expect(layoutOf(result, id).availableMinutes).toBeNull()
       }
     })
+
+    // The counterexample that caught the "matched by lane number" bug:
+    // A (0-5) and B (3-5) overlap, so they share a 2-lane cluster — A gets
+    // lane 0 (footprint 0-50%), B gets lane 1 (footprint 50-100%). C
+    // starts afterward (at 10), doesn't overlap A or B in time, and gets
+    // its own single-lane cluster — lane 0, footprint 0-100%.
+    //
+    // B's lane number (1) never recurs anywhere in the layout, so a fix
+    // that matched "the next occupant of the same lane number" would find
+    // nothing for B and leave it unclamped. But B's 50-100% footprint is
+    // fully covered by C's 0-100% footprint, and C starts only 7 minutes
+    // after B — that overlap is real on screen even though the two lane
+    // NUMBERS (1 and 0) never match.
+    test("accounts for a later block's footprint even when its lane number never recurs", () => {
+      const a = appt('a', 0, 5)
+      const b = appt('b', 3, 2)
+      const c = appt('c', 10, 30)
+      const result = layoutDaySegments([a, b, c], DAY_START, DAY_END)
+
+      const layoutB = layoutOf(result, 'b')
+      // Confirms the fixture actually reproduces the reported shape before
+      // trusting the assertion below.
+      expect(layoutB.laneIndex).toBe(1)
+      expect(layoutB.laneCount).toBe(2)
+      expect(layoutOf(result, 'c').laneIndex).toBe(0)
+      expect(layoutOf(result, 'c').laneCount).toBe(1)
+
+      expect(layoutB.availableMinutes).toBe(7) // C starts at 10, B starts at 3
+    })
   })
 })
 
@@ -251,5 +280,33 @@ describe('blockPixelHeights', () => {
     expect(servicePx + bufferPx).toBeLessThanOrEqual(24)
     expect(servicePx).toBe(24)
     expect(bufferPx).toBe(0)
+  })
+
+  // End-to-end reproduction of the reviewer's counterexample, through the
+  // real layoutDaySegments -> blockPixelHeights pipeline (not a hand-built
+  // SegmentLayout): B's lane number never recurs, so a fix that clamped by
+  // lane number instead of footprint would find no constraint for it and
+  // let its floored block draw from minute 3 to minute 17 — straight
+  // through the 50-100% column C occupies starting at minute 10. Clamped
+  // by footprint instead, B's block stops exactly at minute 10.
+  test("B's drawn extent does not pass minute 10, even though its lane number never recurs", () => {
+    const a = appt('a', 0, 5) // lane 0 of a 2-lane cluster: 0-50%
+    const b = appt('b', 3, 2) // lane 1 of that same cluster: 50-100%
+    const c = appt('c', 10, 30) // alone afterward: its own 1-lane cluster, 0-100%
+    const result = layoutDaySegments([a, b, c], DAY_START, DAY_END)
+    const layoutB = layoutOf(result, 'b')
+
+    const { servicePx, bufferPx } = blockPixelHeights(
+      layoutB,
+      PX_PER_MINUTE,
+      MIN_BLOCK_HEIGHT,
+    )
+    expect(bufferPx).toBe(0)
+    // 28px (the floor) would reach minute 3 + 14 = 17. Clamped to the true
+    // 7-minute gap instead: 14px, ending exactly at minute 10.
+    expect(servicePx).toBe(14)
+    expect(layoutB.startMinute + servicePx / PX_PER_MINUTE).toBeLessThanOrEqual(
+      10,
+    )
   })
 })
