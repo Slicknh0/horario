@@ -10,6 +10,8 @@ export type UiError =
   | 'NOT_FOUND'
   | 'SIGNUP_FAILED'
   | 'VALIDATION_ERROR'
+  | 'RANGE_INVALID'
+  | 'RANGE_OVERLAP'
   // Not a domain code: this is what a component shows when an action's
   // result carries `serverError` (a thrown/unrecognized failure — a bug, a
   // transient DB/network error) instead of a structured `{ ok: false }`.
@@ -33,6 +35,10 @@ const MESSAGES: Record<UiError, string> = {
   SIGNUP_FAILED:
     'Não foi possível criar a conta. Verifique os dados e tente novamente.',
   VALIDATION_ERROR: 'Verifique os campos preenchidos e tente novamente.',
+  RANGE_INVALID:
+    'Horário inválido. O término precisa ser depois do início, dentro do mesmo dia.',
+  RANGE_OVERLAP:
+    'Esses intervalos se sobrepõem. Ajuste os horários para não coincidirem.',
   UNEXPECTED_ERROR: 'Algo deu errado. Tente novamente.',
 }
 
