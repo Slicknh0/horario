@@ -1,12 +1,21 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
-
-// Same message for an unknown e-mail and a wrong password: the form must
-// never reveal which e-mails have accounts.
-const INVALID_CREDENTIALS_MESSAGE = 'E-mail ou senha incorretos'
+import { messageFor } from '@/lib/errors'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,7 +38,9 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        setError(INVALID_CREDENTIALS_MESSAGE)
+        // Same message for an unknown e-mail and a wrong password: the form
+        // must never reveal which e-mails have accounts.
+        setError(messageFor('INVALID_CREDENTIALS'))
         return
       }
 
@@ -38,20 +49,23 @@ export default function LoginPage() {
       // A thrown error (network failure, etc.) gets the same generic
       // message as a rejected sign-in — it must never distinguish itself
       // from a wrong e-mail or password.
-      setError(INVALID_CREDENTIALS_MESSAGE)
+      setError(messageFor('INVALID_CREDENTIALS'))
     } finally {
       setPending(false)
     }
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center p-8">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <h1 className="text-2xl font-semibold">Entrar</h1>
+    <Card className="w-full max-w-sm">
+      <CardHeader className="gap-1.5 p-6 pb-2">
+        <CardTitle className="text-xl">Entrar</CardTitle>
+        <CardDescription>Acesse a agenda do seu negócio.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-6 pt-4">
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email">E-mail</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
               id="email"
               name="email"
               type="email"
@@ -59,9 +73,9 @@ export default function LoginPage() {
               required
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password">Senha</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="password">Senha</Label>
+            <Input
               id="password"
               name="password"
               type="password"
@@ -69,12 +83,27 @@ export default function LoginPage() {
               required
             />
           </div>
-          {error ? <p role="alert">{error}</p> : null}
-          <button type="submit" disabled={pending}>
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <Button type="submit" size="lg" className="w-full" disabled={pending}>
             {pending ? 'Entrando…' : 'Entrar'}
-          </button>
+          </Button>
         </form>
-      </div>
-    </main>
+      </CardContent>
+      <CardFooter className="justify-center border-t border-border p-6 pt-4">
+        <p className="text-sm text-fg-muted">
+          Ainda não tem conta?{' '}
+          <Link
+            href="/cadastro"
+            className="rounded-sm font-medium text-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          >
+            Criar conta
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   )
 }

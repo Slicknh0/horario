@@ -164,6 +164,27 @@ describe('design tokens: WCAG contrast', () => {
       AA_NORMAL_TEXT,
     )
   })
+
+  // Task 14 introduced two pairings that no earlier page used: the landing
+  // page's subheadline/footer/nav-link text (fg-muted directly on the page
+  // background, not on a surface card) and its feature-card and CardTitle
+  // headings (fg directly on `surface`, not `surface-raised`). Both are
+  // measured explicitly rather than assumed safe by resemblance to the
+  // already-passing fg-muted/surface and fg/surface-raised pairs above —
+  // the same rule that caught the original danger/fg 3.37:1 failure.
+  test('fg-muted on bg >= 4.5:1', () => {
+    const fgMuted = tokens['fg-muted']
+    const bg = tokens.bg
+    if (!fgMuted || !bg) throw new Error('tokens not loaded')
+    expect(contrastRatio(fgMuted, bg)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+  })
+
+  test('fg on surface >= 4.5:1', () => {
+    const fg = tokens.fg
+    const surface = tokens.surface
+    if (!fg || !surface) throw new Error('tokens not loaded')
+    expect(contrastRatio(fg, surface)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+  })
 })
 
 describe('oklch -> linear sRGB conversion sanity checks', () => {

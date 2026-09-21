@@ -12,6 +12,11 @@ export type UiError =
   | 'VALIDATION_ERROR'
   | 'RANGE_INVALID'
   | 'RANGE_OVERLAP'
+  // A rejected sign-in (unknown e-mail or wrong password) and a thrown
+  // failure (network error, etc.) both land here — same code, same
+  // message, on purpose: the login form must never reveal which e-mails
+  // have accounts.
+  | 'INVALID_CREDENTIALS'
   // Not a domain code: this is what a component shows when an action's
   // result carries `serverError` (a thrown/unrecognized failure — a bug, a
   // transient DB/network error) instead of a structured `{ ok: false }`.
@@ -39,6 +44,7 @@ const MESSAGES: Record<UiError, string> = {
     'Horário inválido. O término precisa ser depois do início, dentro do mesmo dia.',
   RANGE_OVERLAP:
     'Esses intervalos se sobrepõem. Ajuste os horários para não coincidirem.',
+  INVALID_CREDENTIALS: 'E-mail ou senha incorretos',
   UNEXPECTED_ERROR: 'Algo deu errado. Tente novamente.',
 }
 

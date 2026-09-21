@@ -1,9 +1,21 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAction } from 'next-safe-action/hooks'
 import { type FormEvent, useState } from 'react'
 import { signUpBusiness } from '@/actions/tenant'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { normalizeSlug } from '@/domain/slug'
 import { messageFor } from '@/lib/errors'
 
@@ -54,35 +66,49 @@ export default function CadastroPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center p-8">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <h1 className="text-2xl font-semibold">Criar conta</h1>
+    <Card className="w-full max-w-sm">
+      <CardHeader className="gap-1.5 p-6 pb-2">
+        <CardTitle className="text-xl">Criar conta</CardTitle>
+        <CardDescription>
+          Grátis para começar. Sem cartão de crédito.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-6 pt-4">
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="name">Nome do negócio</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="name">Nome do negócio</Label>
+            <Input
               id="name"
               name="name"
               required
               minLength={2}
               maxLength={80}
+              placeholder="Barbearia do Zé"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="slug">Endereço</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="slug">Endereço</Label>
+            <Input
               id="slug"
               name="slug"
               required
               value={slugInput}
               onChange={(event) => setSlugInput(event.target.value)}
+              aria-invalid={slugError ? true : undefined}
             />
-            <p>horario.app/b/{slugPreview || '…'}</p>
-            {slugError ? <p role="alert">{slugError}</p> : null}
+            <p className="text-sm text-fg-muted">
+              horario.app/b/
+              <span className="text-fg">{slugPreview || '…'}</span>
+            </p>
+            {slugError ? (
+              <p role="alert" className="text-sm text-danger">
+                {slugError}
+              </p>
+            ) : null}
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email">E-mail</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
               id="email"
               name="email"
               type="email"
@@ -90,9 +116,9 @@ export default function CadastroPage() {
               required
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password">Senha</label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="password">Senha</Label>
+            <Input
               id="password"
               name="password"
               type="password"
@@ -101,12 +127,32 @@ export default function CadastroPage() {
               required
             />
           </div>
-          {generalError ? <p role="alert">{generalError}</p> : null}
-          <button type="submit" disabled={isExecuting}>
+          {generalError ? (
+            <p role="alert" className="text-sm text-danger">
+              {generalError}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={isExecuting}
+          >
             {isExecuting ? 'Criando…' : 'Criar conta'}
-          </button>
+          </Button>
         </form>
-      </div>
-    </main>
+      </CardContent>
+      <CardFooter className="justify-center border-t border-border p-6 pt-4">
+        <p className="text-sm text-fg-muted">
+          Já tem conta?{' '}
+          <Link
+            href="/login"
+            className="rounded-sm font-medium text-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          >
+            Entrar
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   )
 }
