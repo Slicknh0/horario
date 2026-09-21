@@ -36,6 +36,38 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The AppointmentSheet's entrance: the overlay fades in, the sheet itself
+   slides in from the right edge it's anchored to. Tailwind v4 ships no
+   animate-in utilities out of the box (that's the tailwindcss-animate
+   plugin, not installed here), so these two are hand-authored instead of
+   pulling in a plugin for two keyframes. Reduced-motion is already
+   handled globally below, which zeroes these durations too. */
+@keyframes agenda-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes agenda-sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-agenda-overlay-in {
+  animation: agenda-overlay-in 150ms ease-out;
+}
+
+.animate-agenda-sheet-in {
+  animation: agenda-sheet-in 200ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

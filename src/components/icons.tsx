@@ -89,3 +89,35 @@ export function TrashIcon(props: SVGProps<SVGSVGElement>) {
     </BaseIcon>
   )
 }
+
+export function PhoneIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M5.5 3.5h2.3l1 3.3-1.7 1.4a9 9 0 0 0 4.7 4.7l1.4-1.7 3.3 1v2.3c0 1-.8 1.7-1.7 1.6A13.5 13.5 0 0 1 3.9 5.2c-.1-.9.6-1.7 1.6-1.7Z" />
+    </BaseIcon>
+  )
+}
+
+export function CloseIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M5 5l10 10M15 5 5 15" />
+    </BaseIcon>
+  )
+}
+
+export function ChevronLeftIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M12.5 4.5 7 10l5.5 5.5" />
+    </BaseIcon>
+  )
+}
+
+export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M7.5 4.5 13 10l-5.5 5.5" />
+    </BaseIcon>
+  )
+}

@@ -3,6 +3,8 @@ import { db } from '@/db/client'
 import { appointments } from '@/db/schema'
 import type { Interval } from '@/domain/types'
 
+export type Appointment = typeof appointments.$inferSelect
+
 export async function getBusyRanges(
   tenantId: string,
   from: Date,
