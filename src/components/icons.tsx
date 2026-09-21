@@ -1,0 +1,75 @@
+import type { SVGProps } from 'react'
+
+// A small hand-authored icon set, one consistent stroke (1.5) and weight
+// across the set, rather than pulling in a general-purpose icon library for
+// six glyphs.
+function BaseIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    />
+  )
+}
+
+export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="3" y="4" width="14" height="13" rx="2" />
+      <path d="M3 8h14M6.5 2.5v3M13.5 2.5v3" />
+    </BaseIcon>
+  )
+}
+
+export function ScissorsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="5.5" cy="5.5" r="2" />
+      <circle cx="5.5" cy="14.5" r="2" />
+      <path d="M7.2 6.8 17 15.5M17 4.5 7.2 13.2" />
+    </BaseIcon>
+  )
+}
+
+export function ClockIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 6v4l3 2" />
+    </BaseIcon>
+  )
+}
+
+export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M3 6h8M14.5 6h2.5M3 10h2.5M8 10h9M3 14h8M14.5 14h2.5" />
+      <circle cx="11" cy="6" r="1.75" fill="currentColor" stroke="none" />
+      <circle cx="5.5" cy="10" r="1.75" fill="currentColor" stroke="none" />
+      <circle cx="11" cy="14" r="1.75" fill="currentColor" stroke="none" />
+    </BaseIcon>
+  )
+}
+
+export function CopyIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="7" y="7" width="9" height="10" rx="1.5" />
+      <path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-7A1.5 1.5 0 0 0 3 5.5v7A1.5 1.5 0 0 0 4.5 14H6" />
+    </BaseIcon>
+  )
+}
+
+export function CheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M4 10.5 8 14.5 16 5.5" />
+    </BaseIcon>
+  )
+}
