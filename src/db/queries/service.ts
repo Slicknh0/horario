@@ -2,6 +2,8 @@ import { and, asc, count, eq } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { services } from '@/db/schema'
 
+export type Service = typeof services.$inferSelect
+
 export function listActiveServices(tenantId: string) {
   return db
     .select()
