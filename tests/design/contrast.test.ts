@@ -202,6 +202,25 @@ describe('design tokens: WCAG contrast', () => {
       AA_NORMAL_TEXT,
     )
   })
+
+  // Review caught `accent` used decoratively on the landing page — the
+  // agenda preview's "occupied slot" dot (bg-accent) and the three feature
+  // icons (text-accent) — when amber is reserved for the primary CTA, the
+  // selected item, and the focus ring. Both were recolored to `fg-muted`
+  // against the same `surface-raised` background they already sat on,
+  // which is a pairing this file had never measured (agenda-status.ts's
+  // `completed` badge uses it too, pre-dating this task, equally
+  // unpinned). Measured at 6.81:1. Same rule as the danger/surface pin
+  // above: a pairing two call sites now depend on belongs here, not only
+  // in a report.
+  test('fg-muted on surface-raised >= 4.5:1', () => {
+    const fgMuted = tokens['fg-muted']
+    const surfaceRaised = tokens['surface-raised']
+    if (!fgMuted || !surfaceRaised) throw new Error('tokens not loaded')
+    expect(contrastRatio(fgMuted, surfaceRaised)).toBeGreaterThanOrEqual(
+      AA_NORMAL_TEXT,
+    )
+  })
 })
 
 describe('oklch -> linear sRGB conversion sanity checks', () => {

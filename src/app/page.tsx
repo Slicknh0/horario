@@ -109,7 +109,7 @@ export default function LandingPage() {
                   {slot.free ? null : (
                     <span
                       aria-hidden="true"
-                      className="size-1.5 shrink-0 rounded-full bg-accent"
+                      className="size-1.5 shrink-0 rounded-full bg-fg-muted"
                     />
                   )}
                 </li>
@@ -130,7 +130,7 @@ export default function LandingPage() {
                   key={title}
                   className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-6"
                 >
-                  <span className="flex size-9 items-center justify-center rounded-md bg-surface-raised text-accent">
+                  <span className="flex size-9 items-center justify-center rounded-md bg-surface-raised text-fg-muted">
                     <Icon className="size-5" />
                   </span>
                   <h3 className="font-display text-lg font-semibold text-fg">
