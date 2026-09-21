@@ -1,5 +1,5 @@
 import { and, asc, count, eq } from 'drizzle-orm'
-import { db } from '@/db/client'
+import { db, type Transaction } from '@/db/client'
 import { services } from '@/db/schema'
 
 export type Service = typeof services.$inferSelect
@@ -20,8 +20,16 @@ export function listAllServices(tenantId: string) {
     .orderBy(asc(services.sortOrder))
 }
 
-export async function countActiveServices(tenantId: string): Promise<number> {
-  const [row] = await db
+// Accepts an optional transaction so a caller enforcing the plan limit can
+// count inside the same transaction that holds the tenant row lock — the
+// count has to run on the connection holding that lock to actually be
+// serialized against a concurrent caller, not just read from `db` on the
+// side.
+export async function countActiveServices(
+  tenantId: string,
+  executor: typeof db | Transaction = db,
+): Promise<number> {
+  const [row] = await executor
     .select({ value: count() })
     .from(services)
     .where(and(eq(services.tenantId, tenantId), eq(services.isActive, true)))

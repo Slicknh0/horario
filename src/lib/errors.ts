@@ -9,6 +9,7 @@ export type UiError =
   | 'SLUG_INVALID'
   | 'NOT_FOUND'
   | 'SIGNUP_FAILED'
+  | 'VALIDATION_ERROR'
 
 const MESSAGES: Record<UiError, string> = {
   SLOT_TAKEN: 'Esse horário acabou de ser preenchido. Escolha outro.',
@@ -25,6 +26,7 @@ const MESSAGES: Record<UiError, string> = {
   NOT_FOUND: 'Não encontramos o que você procura.',
   SIGNUP_FAILED:
     'Não foi possível criar a conta. Verifique os dados e tente novamente.',
+  VALIDATION_ERROR: 'Verifique os campos preenchidos e tente novamente.',
 }
 
 export function messageFor(error: UiError): string {

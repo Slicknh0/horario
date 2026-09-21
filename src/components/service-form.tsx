@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Service } from '@/db/queries/service'
-import { messageFor } from '@/lib/errors'
+import { messageFor, type UiError } from '@/lib/errors'
 
 const CENTS_PER_REAL = 100
 
@@ -53,7 +53,20 @@ export function ServiceForm({
 
   const isExecuting = isEditing ? update.isExecuting : create.isExecuting
   const data = isEditing ? update.result.data : create.result.data
-  const error = data && !data.ok ? data.error : undefined
+  // A validationErrors result means the submitted value bypassed the
+  // mirrored HTML constraints (edited via devtools, or a client where those
+  // attributes didn't apply) — next-safe-action still shapes it as field
+  // errors, but this form only ever needs to say "something's off", not
+  // dump which field or why.
+  const validationErrors = isEditing
+    ? update.result.validationErrors
+    : create.result.validationErrors
+  const error: UiError | undefined =
+    data && !data.ok
+      ? data.error
+      : validationErrors
+        ? 'VALIDATION_ERROR'
+        : undefined
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
