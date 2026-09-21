@@ -84,7 +84,7 @@ Regra sem ambiguidade: exceção **sobrescreve** o `weekly_hours` do dia inteiro
 
 ### `appointment`
 
-`id`, `tenant_id`, `service_id`, `customer_name`, `customer_email`, `customer_phone`, `starts_at`, `ends_at`, `status` (`confirmed` | `completed` | `cancelled` | `no_show`), `cancel_token` (unique), `created_at`, `cancelled_at`.
+`id`, `tenant_id`, `service_id`, `customer_name`, `customer_email`, `customer_phone`, `starts_at`, `ends_at`, `blocked_until`, `status` (`confirmed` | `completed` | `cancelled` | `no_show`), `cancel_token` (unique), `created_at`, `cancelled_at`.
 
 Snapshots gravados no momento do agendamento: `service_name`, `duration_minutes`, `buffer_minutes`, `price_cents`. Alterar o serviço depois não reescreve o histórico.
 
@@ -93,17 +93,17 @@ Snapshots gravados no momento do agendamento: `service_name`, `duration_minutes`
 ### Invariante central
 
 ```sql
-blocked_range tstzrange GENERATED ALWAYS AS (
-  tstzrange(starts_at, ends_at + make_interval(mins => buffer_minutes))
-) STORED,
+CONSTRAINT appointment_blocked_after_end CHECK (blocked_until >= ends_at),
 
 CONSTRAINT appointment_no_overlap EXCLUDE USING gist (
   tenant_id WITH =,
-  blocked_range WITH &&
+  tstzrange(starts_at, blocked_until) WITH &&
 ) WHERE (status = 'confirmed')
 ```
 
-`ends_at` é o fim do atendimento (o que o cliente vê). `blocked_range` estende pelo buffer (o que bloqueia a agenda). São conceitos distintos e por isso são colunas distintas.
+`ends_at` é o fim do atendimento (o que o cliente vê). `blocked_until` é `ends_at + buffer` (o que bloqueia a agenda), gravado pela aplicação junto com os demais snapshots. São conceitos distintos e por isso são colunas distintas.
+
+**Por que não é coluna gerada.** A primeira versão deste spec usava `GENERATED ALWAYS AS (tstzrange(starts_at, ends_at + make_interval(mins => buffer_minutes))) STORED`. O Postgres recusa: `timestamptz + interval` é STABLE, não IMMUTABLE — o resultado depende do `TimeZone` da sessão — e coluna gerada exige expressão imutável (`42P17: generation expression is not immutable`). `tstzrange(timestamptz, timestamptz)` é imutável, então a constraint usa a expressão direta sobre duas colunas concretas. O `CHECK` impede que a aplicação grave um `blocked_until` menor que `ends_at`.
 
 Cancelar muda o `status`, sai do predicado parcial da constraint, e o horário volta a ficar livre automaticamente. Não existe passo de "liberar slot".
 
@@ -144,7 +144,8 @@ Ordem de resolução: exceção sobrescreve o dia (fechado devolve lista vazia);
 Regras de borda, decididas explicitamente:
 
 - **O buffer pode ultrapassar o fim do expediente.** Fecha às 18:00; corte de 45 min às 17:15 com 10 min de buffer é válido. Buffer é folga do profissional, não atendimento; apenas a duração precisa caber.
-- **Horário local inexistente por DST é descartado; horário ambíguo usa a primeira ocorrência.** O Brasil não tem horário de verão hoje, mas `timezone` é coluna livre.
+- **Horário local inexistente por DST é descartado; horário ambíguo resolve para a ocorrência posterior à transição.** O Brasil não tem horário de verão hoje, mas `timezone` é coluna livre. A regra segue o que `@date-fns/tz` faz de fato, verificado por teste — documentar a primeira ocorrência e implementar a segunda seria pior que escolher qualquer uma das duas.
+- **`toInstant` rejeita minuto fora de `[0, 1440)` com exceção**, em vez de devolver `null`. `null` significa exatamente uma coisa: o horário local não existe. Minuto inválido é erro de programação e precisa estourar, não virar "dia sem vaga".
 
 ### `booking-window.ts`
 
@@ -261,9 +262,9 @@ Casos obrigatórios: almoço gerando dois blocos; exceção `is_closed` devolven
 
 ### Integração — constraint
 
-Dois `INSERT` sobrepostos: o segundo levanta `23P01`. Sobreposição com status `cancelled` é aceita. Postgres real via testcontainers (`postgres:17`), porque a constraint exige `btree_gist`.
+Dois `INSERT` sobrepostos: o segundo levanta `23P01`. Sobreposição com status `cancelled` é aceita. Um `INSERT` com `blocked_until < ends_at` levanta `23514`.
 
-Verificação pendente no plano: se PGlite suportar `btree_gist`, substituir testcontainers por ele para ganhar velocidade. Enquanto não verificado, testcontainers é o caminho.
+**PGlite**, não testcontainers. Verificado: `@electric-sql/pglite` 0.5.8 carrega `btree_gist` pelo import `@electric-sql/pglite/contrib/btree_gist`, aceita a constraint `EXCLUDE` e reproduz os quatro comportamentos. Roda em WASM, sem Docker, sem daemon, em milissegundos — e a máquina de desenvolvimento deste projeto não tem Docker instalado.
 
 ### Playwright — 2 fluxos
 

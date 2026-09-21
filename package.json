@@ -35,9 +35,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
-    "@testcontainers/postgresql": "^12.1.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
