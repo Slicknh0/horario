@@ -185,6 +185,23 @@ describe('design tokens: WCAG contrast', () => {
     if (!fg || !surface) throw new Error('tokens not loaded')
     expect(contrastRatio(fg, surface)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
   })
+
+  // Predates Task 14 — app/app/horarios/page.tsx already used
+  // `bg-surface ... text-danger` for its "no hours configured" banner — but
+  // Task 14 added two more call sites (the /login and /cadastro inline
+  // error messages, both rendered inside a Card on `surface`) without this
+  // pairing ever being pinned. A ratio only written down in a report isn't
+  // pinned: the next edit to --color-danger would break the auth error text
+  // and the horários banner with nothing here to catch it. Measured at
+  // 5.11:1. Same rule that caught the original danger/fg 3.37:1 failure.
+  test('danger on surface >= 4.5:1', () => {
+    const danger = tokens.danger
+    const surface = tokens.surface
+    if (!danger || !surface) throw new Error('tokens not loaded')
+    expect(contrastRatio(danger, surface)).toBeGreaterThanOrEqual(
+      AA_NORMAL_TEXT,
+    )
+  })
 })
 
 describe('oklch -> linear sRGB conversion sanity checks', () => {
