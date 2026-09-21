@@ -61,8 +61,17 @@ export function ServiceForm({
   const validationErrors = isEditing
     ? update.result.validationErrors
     : create.result.validationErrors
-  const error: UiError | undefined =
-    data && !data.ok
+  // serverError covers a thrown/unrecognized action failure — a result with
+  // no `data` at all, which checking only `data && !data.ok` silently
+  // ignores: the button re-enables and the customer sees nothing. The
+  // underlying error text is never rendered (it can carry internals); only
+  // the generic UNEXPECTED_ERROR copy is shown, through the same slot below.
+  const serverError = isEditing
+    ? update.result.serverError
+    : create.result.serverError
+  const error: UiError | undefined = serverError
+    ? 'UNEXPECTED_ERROR'
+    : data && !data.ok
       ? data.error
       : validationErrors
         ? 'VALIDATION_ERROR'

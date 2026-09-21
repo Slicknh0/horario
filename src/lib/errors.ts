@@ -10,6 +10,12 @@ export type UiError =
   | 'NOT_FOUND'
   | 'SIGNUP_FAILED'
   | 'VALIDATION_ERROR'
+  // Not a domain code: this is what a component shows when an action's
+  // result carries `serverError` (a thrown/unrecognized failure — a bug, a
+  // transient DB/network error) instead of a structured `{ ok: false }`.
+  // The underlying error text is never surfaced here; it can carry
+  // internals, and this is the ONLY acceptable fallback message for it.
+  | 'UNEXPECTED_ERROR'
 
 const MESSAGES: Record<UiError, string> = {
   SLOT_TAKEN: 'Esse horário acabou de ser preenchido. Escolha outro.',
@@ -27,6 +33,7 @@ const MESSAGES: Record<UiError, string> = {
   SIGNUP_FAILED:
     'Não foi possível criar a conta. Verifique os dados e tente novamente.',
   VALIDATION_ERROR: 'Verifique os campos preenchidos e tente novamente.',
+  UNEXPECTED_ERROR: 'Algo deu errado. Tente novamente.',
 }
 
 export function messageFor(error: UiError): string {

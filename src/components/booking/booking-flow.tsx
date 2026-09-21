@@ -213,8 +213,20 @@ export function BookingFlow({
     )
   }
 
-  const actionError =
-    result.data && !result.data.ok ? result.data.error : undefined
+  // result.serverError covers a thrown/unrecognized action failure (a bug,
+  // a transient DB/network error, a cause chain deeper than
+  // isOverlapViolation's walk) — a case with no `data` at all, which the
+  // earlier `result.data && !result.data.ok` check alone silently ignored:
+  // the spinner would stop and the customer would see nothing, on the one
+  // screen where that reads as "this business is broken". The underlying
+  // serverError text is deliberately never rendered — it can carry
+  // internals — only the generic UNEXPECTED_ERROR copy is shown, through
+  // the same error slot every domain error already uses.
+  const actionError = result.serverError
+    ? ('UNEXPECTED_ERROR' as const)
+    : result.data && !result.data.ok
+      ? result.data.error
+      : undefined
 
   return (
     <div className="flex flex-col gap-5 pb-32">
@@ -270,10 +282,11 @@ export function BookingFlow({
             Seus dados
           </h3>
 
-          {/* Honeypot: positioned off-screen rather than display:none, since
+          {/* Honeypot: visually hidden via the codebase's existing .sr-only
+              pattern (see date-strip.tsx) rather than display:none, since
               some bots skip fields hidden that way. A human never sees or
               reaches it via Tab. */}
-          <div className="absolute left-[-9999px] top-auto" aria-hidden="true">
+          <div className="sr-only" aria-hidden="true">
             <label htmlFor={`${formId}-website`}>Não preencha este campo</label>
             <input
               id={`${formId}-website`}
