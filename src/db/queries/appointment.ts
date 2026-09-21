@@ -1,4 +1,4 @@
-import { and, between, eq, gte } from 'drizzle-orm'
+import { and, eq, gt, gte, lt } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { appointments } from '@/db/schema'
 import type { Interval } from '@/domain/types'
@@ -18,7 +18,13 @@ export async function getBusyRanges(
       and(
         eq(appointments.tenantId, tenantId),
         eq(appointments.status, 'confirmed'),
-        between(appointments.startsAt, from, to),
+        // True interval-overlap, not "starts inside the window": an
+        // appointment that started before `from` but whose blocked_until
+        // reaches past it is still busy right now. `between` on startsAt
+        // alone would miss it, offering the customer a slot the database
+        // then refuses via the overlap constraint.
+        lt(appointments.startsAt, to),
+        gt(appointments.blockedUntil, from),
       ),
     )
 
@@ -39,7 +45,11 @@ export function listAppointmentsBetween(
     .where(
       and(
         eq(appointments.tenantId, tenantId),
-        between(appointments.startsAt, from, to),
+        // Same true interval-overlap semantics as getBusyRanges: an
+        // appointment that began before `from` and runs into the window
+        // still belongs on the agenda.
+        lt(appointments.startsAt, to),
+        gt(appointments.blockedUntil, from),
       ),
     )
 }
