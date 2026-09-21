@@ -18,8 +18,16 @@ function ServiceRow({ service }: { service: Service }) {
   const [isEditing, setIsEditing] = useState(false)
   const { execute, result, isExecuting } = useAction(setServiceActive)
 
-  const toggleError =
-    result.data && !result.data.ok ? result.data.error : undefined
+  // result.serverError covers a thrown/unrecognized action failure — a
+  // result with no `data` at all. Checking only `data && !data.ok` missed
+  // it: the switch would silently snap back to its previous state with no
+  // explanation, same as the identical gap fixed in booking-flow.tsx and
+  // service-form.tsx.
+  const toggleError = result.serverError
+    ? ('UNEXPECTED_ERROR' as const)
+    : result.data && !result.data.ok
+      ? result.data.error
+      : undefined
 
   if (isEditing) {
     return (
