@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTestDb } from './harness'
 
 const { db } = await createTestDb()
@@ -37,9 +37,23 @@ const { localDateOf, toInstant, weekdayOf } = await import('@/domain/time')
 
 const TIMEZONE = 'America/Sao_Paulo'
 
-// Captured once at module load, not hard-coded, so this suite never goes
-// stale the way a literal future date eventually would (same reasoning as
-// tests/db/booking-action.test.ts and tests/db/cancel-action.test.ts).
+// Pinned rather than read from the real wall clock: bookAppointment's own
+// server-side `now = new Date()` (src/actions/book-appointment.ts) has to
+// agree with the NOW this suite derives its slots from, so the fake clock
+// stays set for the whole file (see tests/db/booking-action.test.ts for the
+// same fix and the fuller rationale). Un-pinned, slotAfter(180) — three
+// hours out — could roll past midnight into an invalid minute whenever the
+// suite happened to run late in the evening. 2026-03-02T09:00:00Z is
+// 06:00 in America/Sao_Paulo (UTC-3, no DST since 2019), early enough that
+// a three-hour offset stays well inside the same local day.
+const PINNED_NOW = new Date('2026-03-02T09:00:00Z')
+vi.useFakeTimers()
+vi.setSystemTime(PINNED_NOW)
+
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 const NOW = new Date()
 const TODAY = localDateOf(NOW, TIMEZONE)
 const TODAY_WEEKDAY = weekdayOf(TODAY, TIMEZONE)

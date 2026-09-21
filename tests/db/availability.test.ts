@@ -299,48 +299,68 @@ describe('the link that actually matters: saved weekly hours feed generateSlots'
       ],
     })
 
-    // Walk forward from today to the next Monday so this test never goes
-    // stale and never needs a hard-coded future date.
-    const now = new Date()
-    let date = localDateOf(now, TIMEZONE)
-    while (weekdayOf(date, TIMEZONE) !== 1) {
-      date = addDays(date, 1)
+    // Pinned to a Monday morning rather than read from the real wall clock.
+    // The previous version walked forward from `new Date()` to "the next
+    // Monday", but today can already BE Monday — the loop then never
+    // advances and `now` keeps whatever time of day the suite happens to
+    // run at. Both windows close by 18:00, so any run after 17:30 local
+    // (the last bookable 30-minute start) made `earliest` in generateSlots
+    // land after every remaining slot and the property this test exists to
+    // check — that lunch produces no slots while the rest of the day does
+    // — silently stopped being exercised. 2026-11-02T09:00:00Z is
+    // 06:00 in America/Sao_Paulo (UTC-3, no DST since 2019) on a Monday,
+    // early enough that both the 09:00-12:00 and 13:00-18:00 windows are
+    // still fully in the future.
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-11-02T09:00:00Z'))
+      const now = new Date()
+      let date = localDateOf(now, TIMEZONE)
+      while (weekdayOf(date, TIMEZONE) !== 1) {
+        date = addDays(date, 1)
+      }
+
+      const weeklyHoursForDay = await getWeeklyHours(tenant.id, 1)
+      const exception = await getException(tenant.id, date)
+      expect(exception).toBeNull()
+
+      const slots = generateSlots({
+        date,
+        timezone: TIMEZONE,
+        weeklyHours: weeklyHoursForDay,
+        exception,
+        service: { durationMinutes: 30, bufferMinutes: 0 },
+        busy: [],
+        now,
+        minNoticeMinutes: 0,
+        maxAdvanceDays: 14,
+      })
+
+      // Proves the property isn't vacuous: slots exist somewhere in the day...
+      expect(slots.length).toBeGreaterThan(0)
+
+      const localMinutesOf = (instant: Date) => {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+          timeZone: TIMEZONE,
+          hour: 'numeric',
+          minute: 'numeric',
+          hourCycle: 'h23',
+        }).formatToParts(instant)
+        const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+        const minute = Number(
+          parts.find((p) => p.type === 'minute')?.value ?? 0,
+        )
+        return hour * 60 + minute
+      }
+
+      // ...and specifically none of them fall inside the 12:00-13:00 gap.
+      const lunchSlots = slots.filter((slot) => {
+        const startMinute = localMinutesOf(slot.startsAt)
+        return startMinute >= 720 && startMinute < 780
+      })
+      expect(lunchSlots).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
     }
-
-    const weeklyHoursForDay = await getWeeklyHours(tenant.id, 1)
-    const exception = await getException(tenant.id, date)
-    expect(exception).toBeNull()
-
-    const slots = generateSlots({
-      date,
-      timezone: TIMEZONE,
-      weeklyHours: weeklyHoursForDay,
-      exception,
-      service: { durationMinutes: 30, bufferMinutes: 0 },
-      busy: [],
-      now,
-      minNoticeMinutes: 0,
-      maxAdvanceDays: 14,
-    })
-
-    expect(slots.length).toBeGreaterThan(0)
-
-    const localMinutesOf = (instant: Date) => {
-      const parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: TIMEZONE,
-        hour: 'numeric',
-        minute: 'numeric',
-        hourCycle: 'h23',
-      }).formatToParts(instant)
-      const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
-      const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
-      return hour * 60 + minute
-    }
-
-    const lunchSlots = slots.filter((slot) => {
-      const startMinute = localMinutesOf(slot.startsAt)
-      return startMinute >= 720 && startMinute < 780
-    })
-    expect(lunchSlots).toHaveLength(0)
   })
 })

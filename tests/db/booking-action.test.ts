@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { describe, expect, test, vi } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vitest'
 import { createTestDb } from './harness'
 
 const { db } = await createTestDb()
@@ -23,9 +23,24 @@ const { addDays, localDateOf, toInstant, weekdayOf } = await import(
 
 const TIMEZONE = 'America/Sao_Paulo'
 
-// Captured once at module load rather than hard-coded, so this suite never
-// goes stale the way a literal future date eventually would: every slot
-// below is derived from whatever "now" actually is when the suite runs.
+// Pinned rather than read from the real wall clock: bookAppointment's own
+// server-side `now = new Date()` (src/actions/book-appointment.ts) has to
+// agree with the NOW this suite computes its slots from, so the fake clock
+// stays set for the whole file, not just at import time — a real-clock NOW
+// captured once at module load previously meant slotAfter(180 + 3 * 60)
+// (six hours out) could roll past midnight into an invalid minute whenever
+// the suite happened to run late in the day. 2026-03-02T09:00:00Z is
+// 06:00 in America/Sao_Paulo (UTC-3, no DST since 2019) — early enough
+// that every offset used below (up to 360 minutes) lands well before
+// midnight, on the same local date.
+const PINNED_NOW = new Date('2026-03-02T09:00:00Z')
+vi.useFakeTimers()
+vi.setSystemTime(PINNED_NOW)
+
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 const NOW = new Date()
 const TODAY = localDateOf(NOW, TIMEZONE)
 const TODAY_WEEKDAY = weekdayOf(TODAY, TIMEZONE)
@@ -255,9 +270,12 @@ describe('bookAppointment', () => {
   // "not free right now". Time is pinned via fake timers rather than the
   // suite's real "NOW", since this test needs a specific, controlled
   // relationship between "now" and the configured opening window that
-  // picking an offset from the real clock can't guarantee.
+  // picking an offset from the real clock can't guarantee. The clock is
+  // already fake (pinned to PINNED_NOW at module load, see above) for the
+  // whole file, so this only needs to move the system time to a second
+  // pinned instant and move it back — never drop to the real clock, which
+  // would unpin every test that runs after this one.
   test('a startsAt genuinely outside opening hours (03:00, before an 08:00 opening) is rejected with OUTSIDE_HOURS and writes no row', async () => {
-    vi.useFakeTimers()
     try {
       // 03:30 UTC = 00:30 in America/Sao_Paulo (UTC-3, no DST since 2019).
       const pinnedNow = new Date('2026-01-08T03:30:00Z')
@@ -320,7 +338,7 @@ describe('bookAppointment', () => {
         .where(eq(appointments.serviceId, service.id))
       expect(rows).toHaveLength(0)
     } finally {
-      vi.useRealTimers()
+      vi.setSystemTime(PINNED_NOW)
     }
   })
 

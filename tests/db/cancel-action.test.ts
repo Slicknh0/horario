@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { describe, expect, test, vi } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vitest'
 import { createTestDb } from './harness'
 
 const { db } = await createTestDb()
@@ -23,8 +23,23 @@ const { localDateOf, toInstant, weekdayOf } = await import('@/domain/time')
 
 const TIMEZONE = 'America/Sao_Paulo'
 
-// Captured once at module load, not hard-coded, so this suite never goes
-// stale the way a literal future date eventually would.
+// Pinned rather than read from the real wall clock: bookAppointment's own
+// server-side `now = new Date()` (src/actions/book-appointment.ts) has to
+// agree with the NOW this suite derives its slots from, so the fake clock
+// stays set for the whole file (see tests/db/booking-action.test.ts for the
+// same fix and the fuller rationale). Un-pinned, slotAfter(180) — three
+// hours out — could roll past midnight into an invalid minute whenever the
+// suite happened to run late in the evening. 2026-03-02T09:00:00Z is
+// 06:00 in America/Sao_Paulo (UTC-3, no DST since 2019), early enough that
+// a three-hour offset stays well inside the same local day.
+const PINNED_NOW = new Date('2026-03-02T09:00:00Z')
+vi.useFakeTimers()
+vi.setSystemTime(PINNED_NOW)
+
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 const NOW = new Date()
 const TODAY = localDateOf(NOW, TIMEZONE)
 const TODAY_WEEKDAY = weekdayOf(TODAY, TIMEZONE)
@@ -196,8 +211,11 @@ describe('cancelAppointment', () => {
     const token = await bookAndGetToken(tenant, service, startsAt)
 
     // ...then time advances to inside the 120-minute cancellation window:
-    // only 10 minutes remain before startsAt.
-    vi.useFakeTimers()
+    // only 10 minutes remain before startsAt. The clock is already fake
+    // (pinned to PINNED_NOW at module load, see above) for the whole file,
+    // so this only moves the system time to a second instant and moves it
+    // back — never drops to the real clock, which would unpin every test
+    // that runs after this one.
     try {
       vi.setSystemTime(new Date(startsAt.getTime() - 10 * 60_000))
 
@@ -207,7 +225,7 @@ describe('cancelAppointment', () => {
         error: 'TOO_LATE_TO_CANCEL',
       })
     } finally {
-      vi.useRealTimers()
+      vi.setSystemTime(PINNED_NOW)
     }
 
     const [row] = await db
