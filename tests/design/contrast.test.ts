@@ -148,6 +148,22 @@ describe('design tokens: WCAG contrast', () => {
       AA_NORMAL_TEXT,
     )
   })
+
+  // The agenda's "Não veio" button (appointment-sheet.tsx) uses `danger`
+  // as its own text color — border-danger/text-danger, persistent, not
+  // just on hover — against the button's neutral hover:bg-surface-raised.
+  // That's a pairing nothing else in the codebase used before it, so it
+  // gets measured here rather than assumed safe by resemblance to the
+  // danger-fg/danger pair above (a different foreground token entirely).
+  // This is the same rule that caught the original 3.37:1 failure.
+  test('danger on surface-raised >= 4.5:1', () => {
+    const danger = tokens.danger
+    const surfaceRaised = tokens['surface-raised']
+    if (!danger || !surfaceRaised) throw new Error('tokens not loaded')
+    expect(contrastRatio(danger, surfaceRaised)).toBeGreaterThanOrEqual(
+      AA_NORMAL_TEXT,
+    )
+  })
 })
 
 describe('oklch -> linear sRGB conversion sanity checks', () => {

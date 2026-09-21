@@ -1,5 +1,11 @@
 import type { AppointmentStatus, TimeRange } from './types'
 
+// This module is pure business/layout logic: minutes in, minutes (or lane
+// numbers) out, no React, no framework, and — per the spec — no language.
+// "O domínio não conhece idioma": every string a human reads (status
+// labels, the danger/no_show styling) lives in src/lib/agenda-status.ts
+// instead, which both agenda views and the sheet import from.
+
 // A snapshot-only projection of an appointment row for the agenda UI —
 // deliberately narrower than the full `appointment` table row: it never
 // carries `tenantId`, `cancelToken` or `customerEmail` into the browser
@@ -49,6 +55,43 @@ export function agendaHourBounds(
   }
 }
 
+// The other half of the fallback computation above: when a weekday has no
+// configured hours at all, the bound instead covers whatever appointments
+// actually landed on it. Was duplicated verbatim (a ~15-line IIFE) in both
+// agenda-day.tsx and agenda-week.tsx; extracted here so a future change to
+// how the fallback is computed can't land in one view and not the other.
+export function fallbackHourBounds(
+  segments: Iterable<{
+    startMinute: number
+    serviceMinutes: number
+    bufferMinutes: number
+  }>,
+): HourBounds | null {
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+  for (const segment of segments) {
+    min = Math.min(min, segment.startMinute)
+    max = Math.max(
+      max,
+      segment.startMinute + segment.serviceMinutes + segment.bufferMinutes,
+    )
+  }
+  if (!Number.isFinite(min)) return null
+  return {
+    startMinute: Math.max(0, Math.floor(min / 60) * 60),
+    endMinute: Math.min(24 * 60, Math.ceil(max / 60) * 60),
+  }
+}
+
+// "09:00" from a minute-of-day — plain zero-padded arithmetic, no locale
+// involved, so it belongs beside the rest of this module's language-free
+// layout math rather than duplicated per view.
+export function hourLabel(minute: number): string {
+  const h = Math.floor(minute / 60) % 24
+  const m = minute % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 export type DaySegment = {
   startMinute: number
   serviceMinutes: number
@@ -92,20 +135,16 @@ export function daySegment(
   return { startMinute, serviceMinutes, bufferMinutes }
 }
 
-// Portuguese label for each status — used by the agenda blocks' aria-label
-// and by the sheet's badge, so the two can never drift into two different
-// words for the same status. Not routed through messageFor: that function
-// is for error codes (see src/lib/errors.ts), and a status is not an error.
-export const AGENDA_STATUS_LABEL: Record<AppointmentStatus, string> = {
-  confirmed: 'Confirmado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-  no_show: 'Não veio',
-}
-
 export type SegmentLayout = DaySegment & {
   laneIndex: number
   laneCount: number
+  // Minutes of true, gap-guaranteed clearance before the next appointment
+  // in this same lane starts — `null` when nothing follows it in that
+  // lane. This is what stops a rendering floor (a minimum pixel height for
+  // legibility on a very short appointment) from drawing into where the
+  // next block visually begins: see blockPixelHeights below, which is the
+  // only thing that should ever consume this field.
+  availableMinutes: number | null
 }
 
 // Marking an appointment cancelled or no_show frees its slot for a new
@@ -169,9 +208,68 @@ export function layoutDaySegments(
     active.push({ end: item.blockEnd, lane })
     cluster.push(item)
     clusterLanes = Math.max(clusterLanes, lane + 1)
-    result.set(item.id, { ...item.seg, laneIndex: lane, laneCount: 1 })
+    result.set(item.id, {
+      ...item.seg,
+      laneIndex: lane,
+      laneCount: 1,
+      availableMinutes: null,
+    })
   }
   flushCluster()
 
+  // Second pass: for every lane number, walk its occupants in start order
+  // (already guaranteed by `items` being sorted) and record, on each one,
+  // the gap to the next occupant of that same lane. Deliberately not
+  // scoped to a single cluster — two items can share a lane number across
+  // a cluster boundary, and both still start at the same horizontal edge
+  // on screen, so the gap between them is still the real constraint on how
+  // far the earlier one's rendered height is allowed to reach.
+  const lastInLane = new Map<number, Sortable>()
+  for (const item of items) {
+    const layout = result.get(item.id)
+    if (!layout) continue
+    const previous = lastInLane.get(layout.laneIndex)
+    if (previous) {
+      const previousLayout = result.get(previous.id)
+      if (previousLayout) {
+        previousLayout.availableMinutes =
+          item.seg.startMinute - previousLayout.startMinute
+      }
+    }
+    lastInLane.set(layout.laneIndex, item)
+  }
+
   return result
+}
+
+export type BlockPixelHeights = { servicePx: number; bufferPx: number }
+
+// The rendering floor (a minimum pixel height so a very short appointment
+// is still legible/tappable) is a nicety, never a promise the layout can
+// break: it must never draw past `availableMinutes` — the true, verified
+// gap to the next appointment in the same lane. Without this clamp, a
+// service under the floor's equivalent duration renders taller than it
+// lasts, and because the buffer's fainter extension stacks right after it,
+// the pair can visually run into a same-lane appointment that
+// layoutDaySegments correctly decided does not overlap in time — the
+// algorithm is right and the pixels lie. Shared by both agenda views
+// (which use different pxPerMinute/floor values) rather than duplicated,
+// since this exact geometry mistake is cheap to reintroduce independently
+// in each one.
+export function blockPixelHeights(
+  entry: SegmentLayout,
+  pxPerMinute: number,
+  minBlockHeightPx: number,
+): BlockPixelHeights {
+  const trueServicePx = entry.serviceMinutes * pxPerMinute
+  const trueBufferPx = entry.bufferMinutes * pxPerMinute
+  const maxPx =
+    entry.availableMinutes === null
+      ? Number.POSITIVE_INFINITY
+      : entry.availableMinutes * pxPerMinute
+
+  const servicePx = Math.min(Math.max(trueServicePx, minBlockHeightPx), maxPx)
+  const bufferPx = Math.max(0, Math.min(trueBufferPx, maxPx - servicePx))
+
+  return { servicePx, bufferPx }
 }

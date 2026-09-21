@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { layoutDaySegments, type SegmentLayout } from '@/domain/agenda'
+import {
+  blockPixelHeights,
+  layoutDaySegments,
+  type SegmentLayout,
+} from '@/domain/agenda'
 
 // A fixed anchor rather than `new Date()`: every case below is expressed as
 // "minutes since dayStart", so the anchor's actual value is irrelevant as
@@ -128,5 +132,124 @@ describe('layoutDaySegments', () => {
       expect(layoutOf(shuffled, id)).toEqual(expected)
       expect(layoutOf(reversed, id)).toEqual(expected)
     }
+  })
+
+  describe('availableMinutes', () => {
+    test('is the gap to the next appointment in the same lane', () => {
+      // Both non-overlapping, so both land in lane 0: 'a' at 0-30, 'b' at
+      // 60-90. The gap that matters is start-to-start (60 - 0), not
+      // end-to-start — that's the true amount of vertical room 'a' has
+      // before 'b' visually begins, regardless of how short 'a' itself is.
+      const items = [appt('a', 0, 30), appt('b', 60, 30)]
+      const result = layoutDaySegments(items, DAY_START, DAY_END)
+
+      expect(layoutOf(result, 'a').availableMinutes).toBe(60)
+      expect(layoutOf(result, 'b').availableMinutes).toBeNull()
+    })
+
+    test('is null for the last appointment in its lane', () => {
+      // Three mutually overlapping: three lanes, and every one of them is
+      // the last (and only) occupant of its own lane.
+      const items = [appt('a', 0, 100), appt('b', 10, 80), appt('c', 20, 60)]
+      const result = layoutDaySegments(items, DAY_START, DAY_END)
+
+      for (const id of ['a', 'b', 'c']) {
+        expect(layoutOf(result, id).availableMinutes).toBeNull()
+      }
+    })
+  })
+})
+
+describe('blockPixelHeights', () => {
+  const PX_PER_MINUTE = 2
+  const MIN_BLOCK_HEIGHT = 28
+
+  // A 10-minute service at 2px/minute is 20px — under the 28px legibility
+  // floor — and nothing follows it in its lane, so the floor applies with
+  // no clamp needed.
+  test('applies the floor in full when there is nothing after it in the lane', () => {
+    const entry: SegmentLayout = {
+      startMinute: 0,
+      serviceMinutes: 10,
+      bufferMinutes: 0,
+      laneIndex: 0,
+      laneCount: 1,
+      availableMinutes: null,
+    }
+    const { servicePx, bufferPx } = blockPixelHeights(
+      entry,
+      PX_PER_MINUTE,
+      MIN_BLOCK_HEIGHT,
+    )
+    expect(servicePx).toBe(MIN_BLOCK_HEIGHT)
+    expect(bufferPx).toBe(0)
+  })
+
+  // This is Important 1 from the review, reproduced directly: a 10-minute
+  // service (20px true height) with the next appointment in its lane only
+  // 12 minutes away (24px of true clearance). Flooring to 28px would draw
+  // 4px into where the next block begins even though layoutDaySegments
+  // correctly decided the two do not overlap in time — servicePx must
+  // never exceed availableMinutes converted to pixels.
+  test('clamps the floor to the true gap before the next block in the lane', () => {
+    const entry: SegmentLayout = {
+      startMinute: 0,
+      serviceMinutes: 10,
+      bufferMinutes: 0,
+      laneIndex: 0,
+      laneCount: 1,
+      availableMinutes: 12,
+    }
+    const { servicePx, bufferPx } = blockPixelHeights(
+      entry,
+      PX_PER_MINUTE,
+      MIN_BLOCK_HEIGHT,
+    )
+    expect(servicePx).toBe(24) // 12 minutes * 2px/min, not the 28px floor
+    expect(bufferPx).toBe(0)
+  })
+
+  // A true (unfloored) service height that's already >= the floor is
+  // rendered at its true size, never shrunk — the floor is a minimum, not
+  // a target.
+  test('renders at true size when the true height already exceeds the floor', () => {
+    const entry: SegmentLayout = {
+      startMinute: 0,
+      serviceMinutes: 30,
+      bufferMinutes: 10,
+      laneIndex: 0,
+      laneCount: 1,
+      availableMinutes: null,
+    }
+    const { servicePx, bufferPx } = blockPixelHeights(
+      entry,
+      PX_PER_MINUTE,
+      MIN_BLOCK_HEIGHT,
+    )
+    expect(servicePx).toBe(60) // 30 min * 2px/min
+    expect(bufferPx).toBe(20) // 10 min * 2px/min
+  })
+
+  // When there's only enough room for the (floored) service block itself,
+  // the buffer's fainter extension is the first thing to give — it's
+  // decorative, the service block is the click target and must not shrink
+  // below what the gap allows either.
+  test('shrinks the buffer before it would let the pair exceed the available gap', () => {
+    const entry: SegmentLayout = {
+      startMinute: 0,
+      serviceMinutes: 10, // true 20px
+      bufferMinutes: 10, // true 20px more
+      laneIndex: 0,
+      laneCount: 1,
+      availableMinutes: 12, // only 24px of true clearance in total
+    }
+    const { servicePx, bufferPx } = blockPixelHeights(
+      entry,
+      PX_PER_MINUTE,
+      MIN_BLOCK_HEIGHT,
+    )
+    expect(servicePx + bufferPx).toBeLessThanOrEqual(24)
+    expect(servicePx).toBe(24)
+    expect(bufferPx).toBe(0)
   })
 })

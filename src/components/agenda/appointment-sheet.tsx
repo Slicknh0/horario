@@ -5,7 +5,9 @@ import { useAction } from 'next-safe-action/hooks'
 import { setAppointmentStatus } from '@/actions/appointment-status'
 import { CloseIcon, PhoneIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
-import { AGENDA_STATUS_LABEL, type AgendaAppointment } from '@/domain/agenda'
+import type { AgendaAppointment } from '@/domain/agenda'
+import { formatTime } from '@/domain/time'
+import { AGENDA_STATUS_LABEL } from '@/lib/agenda-status'
 import { messageFor } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 
@@ -55,15 +57,13 @@ export function AppointmentSheet({
 
   if (!appointment) return null
 
+  // Unique to this sheet (weekday + day + month), so not one of the
+  // duplicated time-only formatters extracted to domain/time.ts's
+  // formatTime.
   const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    timeZone: timezone,
-  })
-  const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
     timeZone: timezone,
   })
 
@@ -119,8 +119,8 @@ export function AppointmentSheet({
                 {dateFormatter.format(appointment.startsAt)}
               </span>
               <span className="tnum font-medium text-fg">
-                {timeFormatter.format(appointment.startsAt)}–
-                {timeFormatter.format(appointment.endsAt)}
+                {formatTime(appointment.startsAt, timezone)}–
+                {formatTime(appointment.endsAt, timezone)}
               </span>
             </div>
           </Dialog.Description>
@@ -171,11 +171,19 @@ export function AppointmentSheet({
             >
               Concluído
             </Button>
+            {/* Persistent border-danger/text-danger (not just on hover) for
+                the same commercial-signal reason no_show gets its own
+                block style; the hover state is deliberately left as the
+                outline variant's own neutral hover:bg-surface-raised
+                rather than a translucent danger tint, so the only new
+                pairing this introduces — text-danger on surface-raised —
+                is a plain opaque one already measured in
+                tests/design/contrast.test.ts. */}
             <Button
               type="button"
               variant="outline"
               disabled={isExecuting}
-              className="border-danger text-danger hover:bg-danger/10 hover:text-danger"
+              className="border-danger text-danger"
               onClick={() => handleStatus('no_show')}
             >
               Não veio

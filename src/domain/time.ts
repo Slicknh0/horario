@@ -75,3 +75,18 @@ export function formatFullDateTime(instant: Date, timeZone: string): string {
     timeZone,
   }).format(instant)
 }
+
+// The time-only counterpart to formatFullDateTime, for places that already
+// show the date separately and only need "HH:mm" — the agenda's day/week
+// grids and the appointment sheet. Was three byte-identical
+// `new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit',
+// timeZone })` instances before this was extracted; `timeZone` is never
+// optional here for the same reason it never is on formatFullDateTime —
+// always the tenant's, never the server's or the browser's.
+export function formatTime(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  }).format(instant)
+}
