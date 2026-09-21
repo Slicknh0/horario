@@ -5,20 +5,18 @@ import { useAction } from 'next-safe-action/hooks'
 import { type FormEvent, useState } from 'react'
 import { signUpBusiness } from '@/actions/tenant'
 import { normalizeSlug } from '@/domain/slug'
+import { messageFor } from '@/lib/errors'
 
-const SLUG_ERROR_MESSAGES = {
-  SLUG_TAKEN: 'Esse endereço já está em uso',
-  SLUG_RESERVED: 'Esse endereço é reservado',
-  SLUG_INVALID: 'Use de 3 a 50 letras, números ou hífens',
-} as const
-
-const SIGNUP_FAILED_MESSAGE =
-  'Não foi possível criar a conta. Verifique o e-mail e tente novamente.'
+const SLUG_ERROR_CODES = [
+  'SLUG_TAKEN',
+  'SLUG_RESERVED',
+  'SLUG_INVALID',
+] as const
 
 function isSlugErrorCode(
   code: string,
-): code is keyof typeof SLUG_ERROR_MESSAGES {
-  return code in SLUG_ERROR_MESSAGES
+): code is (typeof SLUG_ERROR_CODES)[number] {
+  return (SLUG_ERROR_CODES as readonly string[]).includes(code)
 }
 
 export default function CadastroPage() {
@@ -35,13 +33,13 @@ export default function CadastroPage() {
     result.data && !result.data.ok ? result.data.error : undefined
   const slugError =
     actionError && isSlugErrorCode(actionError)
-      ? SLUG_ERROR_MESSAGES[actionError]
+      ? messageFor(actionError)
       : undefined
   const generalError =
     actionError === 'SIGNUP_FAILED'
-      ? SIGNUP_FAILED_MESSAGE
+      ? messageFor(actionError)
       : result.serverError
-        ? 'Não foi possível criar a conta. Verifique os dados e tente novamente.'
+        ? messageFor('SIGNUP_FAILED')
         : undefined
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
