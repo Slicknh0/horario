@@ -6,10 +6,19 @@ import { type FormEvent, useState } from 'react'
 import { signUpBusiness } from '@/actions/tenant'
 import { normalizeSlug } from '@/domain/slug'
 
-const SLUG_ERROR_MESSAGES: Record<string, string> = {
+const SLUG_ERROR_MESSAGES = {
   SLUG_TAKEN: 'Esse endereço já está em uso',
   SLUG_RESERVED: 'Esse endereço é reservado',
   SLUG_INVALID: 'Use de 3 a 50 letras, números ou hífens',
+} as const
+
+const SIGNUP_FAILED_MESSAGE =
+  'Não foi possível criar a conta. Verifique o e-mail e tente novamente.'
+
+function isSlugErrorCode(
+  code: string,
+): code is keyof typeof SLUG_ERROR_MESSAGES {
+  return code in SLUG_ERROR_MESSAGES
 }
 
 export default function CadastroPage() {
@@ -22,13 +31,18 @@ export default function CadastroPage() {
   })
 
   const slugPreview = normalizeSlug(slugInput)
+  const actionError =
+    result.data && !result.data.ok ? result.data.error : undefined
   const slugError =
-    result.data && !result.data.ok
-      ? SLUG_ERROR_MESSAGES[result.data.error]
+    actionError && isSlugErrorCode(actionError)
+      ? SLUG_ERROR_MESSAGES[actionError]
       : undefined
-  const generalError = result.serverError
-    ? 'Não foi possível criar a conta. Verifique os dados e tente novamente.'
-    : undefined
+  const generalError =
+    actionError === 'SIGNUP_FAILED'
+      ? SIGNUP_FAILED_MESSAGE
+      : result.serverError
+        ? 'Não foi possível criar a conta. Verifique os dados e tente novamente.'
+        : undefined
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
