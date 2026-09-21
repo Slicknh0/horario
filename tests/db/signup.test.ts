@@ -6,7 +6,7 @@ const { db } = await createTestDb()
 vi.mock('@/db/client', () => ({ db }))
 
 const { signUpBusiness } = await import('@/actions/tenant')
-const { tenants } = await import('@/db/schema')
+const { tenants, user } = await import('@/db/schema')
 
 describe('signUpBusiness', () => {
   test('creates the tenant and links the user to it', async () => {
@@ -55,5 +55,46 @@ describe('signUpBusiness', () => {
       where: eq(tenants.slug, 'outro-salao'),
     })
     expect(orphan).toBeUndefined()
+  })
+
+  test('compensates for a failed user update by removing both the tenant and the user, and lets a retry succeed', async () => {
+    const slug = 'falha-negocio'
+    const email = 'falha@example.com'
+
+    // Simulate the update-after-signUpEmail step failing: the tenant is
+    // already inserted and the Better Auth user already created by this
+    // point, so both must be cleaned up, not just the tenant.
+    const updateSpy = vi.spyOn(db, 'update').mockImplementationOnce(() => {
+      throw new Error('simulated update failure')
+    })
+
+    const failed = await signUpBusiness({
+      name: 'Falha Negócio',
+      slug,
+      email,
+      password: 'senha12345',
+    })
+    expect(failed?.data).toEqual({ ok: false, error: 'SIGNUP_FAILED' })
+    updateSpy.mockRestore()
+
+    const orphanTenant = await db.query.tenants.findFirst({
+      where: eq(tenants.slug, slug),
+    })
+    expect(orphanTenant).toBeUndefined()
+
+    const orphanUser = await db.query.user.findFirst({
+      where: eq(user.email, email),
+    })
+    expect(orphanUser).toBeUndefined()
+
+    // The property the user actually cares about: the address is usable
+    // again, not just internally consistent.
+    const retried = await signUpBusiness({
+      name: 'Falha Negócio',
+      slug,
+      email,
+      password: 'senha12345',
+    })
+    expect(retried?.data).toEqual({ ok: true, slug })
   })
 })

@@ -22,18 +22,26 @@ export default function LoginPage() {
     const email = String(formData.get('email') ?? '')
     const password = String(formData.get('password') ?? '')
 
-    const { error: signInError } = await authClient.signIn.email({
-      email,
-      password,
-    })
+    try {
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password,
+      })
 
-    if (signInError) {
+      if (signInError) {
+        setError(INVALID_CREDENTIALS_MESSAGE)
+        return
+      }
+
+      router.push('/app')
+    } catch {
+      // A thrown error (network failure, etc.) gets the same generic
+      // message as a rejected sign-in — it must never distinguish itself
+      // from a wrong e-mail or password.
       setError(INVALID_CREDENTIALS_MESSAGE)
+    } finally {
       setPending(false)
-      return
     }
-
-    router.push('/app')
   }
 
   return (
