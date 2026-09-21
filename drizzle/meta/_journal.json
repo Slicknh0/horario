@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789949255064,
+      "tag": "0000_ordinary_microchip",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789949264233,
+      "tag": "0001_overlap_constraint",
+      "breakpoints": true
+    }
+  ]
+}
