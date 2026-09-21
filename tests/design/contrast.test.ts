@@ -90,6 +90,8 @@ describe('design tokens: WCAG contrast', () => {
       'fg-muted',
       'accent',
       'accent-fg',
+      'danger',
+      'danger-fg',
     ]) {
       expect(
         tokens[name],
@@ -128,6 +130,21 @@ describe('design tokens: WCAG contrast', () => {
     const surfaceRaised = tokens['surface-raised']
     if (!fg || !surfaceRaised) throw new Error('tokens not loaded')
     expect(contrastRatio(fg, surfaceRaised)).toBeGreaterThanOrEqual(
+      AA_NORMAL_TEXT,
+    )
+  })
+
+  // Added after review caught the destructive button variant pairing
+  // --color-danger with --color-fg at 3.37:1 (below AA) because no
+  // foreground token existed for danger and one had to be guessed. The
+  // guess was wrong precisely because nothing measured it — every
+  // foreground/background token pair the design system defines belongs
+  // here, not just the four the original brief happened to name.
+  test('danger-fg on danger >= 4.5:1', () => {
+    const dangerFg = tokens['danger-fg']
+    const danger = tokens.danger
+    if (!dangerFg || !danger) throw new Error('tokens not loaded')
+    expect(contrastRatio(dangerFg, danger)).toBeGreaterThanOrEqual(
       AA_NORMAL_TEXT,
     )
   })

@@ -8,8 +8,7 @@ const BUTTON_VARIANTS = {
   outline:
     'border border-border bg-transparent text-fg hover:bg-surface-raised',
   ghost: 'bg-transparent text-fg hover:bg-surface-raised',
-  destructive: 'bg-danger text-fg hover:opacity-90',
-  link: 'h-auto bg-transparent p-0 text-accent underline-offset-4 hover:underline',
+  destructive: 'bg-danger text-danger-fg hover:opacity-90',
 } as const
 
 const BUTTON_SIZES = {

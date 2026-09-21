@@ -10,6 +10,7 @@
   --color-accent: oklch(78% 0.155 70);
   --color-accent-fg: oklch(18% 0.03 70);
   --color-danger: oklch(64% 0.19 25);
+  --color-danger-fg: oklch(18% 0.03 25);
 
   /* next/font loads the actual files (see app/layout.tsx) and exposes them
      through --font-display-loaded / --font-sans-loaded; wrapping those here
