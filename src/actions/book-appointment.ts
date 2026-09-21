@@ -72,18 +72,22 @@ export const bookAppointment = publicAction
     const dayStart = new Date(parsedInput.startsAt.getTime() - 24 * 3600_000)
     const dayEnd = new Date(parsedInput.startsAt.getTime() + 24 * 3600_000)
 
+    const weeklyHours = await getWeeklyHours(
+      tenant.id,
+      weekdayOf(date, tenant.timezone),
+    )
+    const exception = await getException(tenant.id, date)
+    const serviceDuration = {
+      durationMinutes: service.durationMinutes,
+      bufferMinutes: service.bufferMinutes,
+    }
+
     const slots = generateSlots({
       date,
       timezone: tenant.timezone,
-      weeklyHours: await getWeeklyHours(
-        tenant.id,
-        weekdayOf(date, tenant.timezone),
-      ),
-      exception: await getException(tenant.id, date),
-      service: {
-        durationMinutes: service.durationMinutes,
-        bufferMinutes: service.bufferMinutes,
-      },
+      weeklyHours,
+      exception,
+      service: serviceDuration,
       busy: await getBusyRanges(tenant.id, dayStart, dayEnd),
       now,
       minNoticeMinutes: tenant.minNoticeMinutes,
@@ -92,7 +96,40 @@ export const bookAppointment = publicAction
 
     const target = parsedInput.startsAt.getTime()
     if (!slots.some((s) => s.startsAt.getTime() === target)) {
-      return { ok: false as const, error: 'OUTSIDE_HOURS' as const }
+      // Not available right now — but "not available" has two very
+      // different causes, and the customer needs them told apart. The
+      // common case is someone who filled in the form while the slot was
+      // still free and it got taken out from under them while they typed;
+      // telling them the shop is "outside opening hours" is false and
+      // leaves them with no idea that a different time would work.
+      //
+      // Re-running with no busy intervals answers "would the shop's hours,
+      // exceptions and this service's duration ever have allowed this
+      // instant, ignoring what's already booked?". If yes, it was a
+      // legitimate slot someone else just took — SLOT_TAKEN, which the UI
+      // already recovers from by reloading the day's slots and keeping the
+      // customer on this step. If no, it was never bookable at all
+      // (forged, or truly outside opening hours) — OUTSIDE_HOURS.
+      const slotsIgnoringBusy = generateSlots({
+        date,
+        timezone: tenant.timezone,
+        weeklyHours,
+        exception,
+        service: serviceDuration,
+        busy: [],
+        now,
+        minNoticeMinutes: tenant.minNoticeMinutes,
+        maxAdvanceDays: tenant.maxAdvanceDays,
+      })
+      const wasLegitimateSlot = slotsIgnoringBusy.some(
+        (s) => s.startsAt.getTime() === target,
+      )
+      return {
+        ok: false as const,
+        error: wasLegitimateSlot
+          ? ('SLOT_TAKEN' as const)
+          : ('OUTSIDE_HOURS' as const),
+      }
     }
 
     const cancelToken = randomBytes(24).toString('base64url')
