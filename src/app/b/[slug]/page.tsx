@@ -13,16 +13,13 @@ import {
   weekdayOf,
 } from '@/domain/time'
 import type { LocalDate, Slot, TimeRange } from '@/domain/types'
+import { firstParam } from '@/lib/utils'
 
 // How many days ahead the date strip shows. Clamped against the tenant's
 // own maxAdvanceDays below — a tenant that only takes bookings a few days
 // out never sees a strip full of dates it would reject anyway.
 const DATE_STRIP_DAYS = 14
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
-
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value
-}
 
 // This is the public front door: an end customer with no account, likely on
 // a phone, who will use this page exactly once. Step state (service, day)

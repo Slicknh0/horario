@@ -60,3 +60,18 @@ export function weekdayOf(date: LocalDate, timeZone: string): number {
   if (!instant) throw new Error(`Cannot resolve weekday for ${date}`)
   return new TZDate(instant.getTime(), timeZone).getDay()
 }
+
+// The one formal "weekday, day de month de year às HH:mm" rendering used
+// everywhere a customer needs to recognize their own booking outside the
+// live slot picker (confirmation e-mail, confirmation screen, the /a/token
+// management page) — a single call site so none of them can drift into
+// formatting the same instant two different ways, and so `timeZone` is
+// never optional to a caller: always the tenant's, never the server's or
+// the browser's.
+export function formatFullDateTime(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone,
+  }).format(instant)
+}
