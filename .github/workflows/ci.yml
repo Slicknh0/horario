@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# CI env shared by every job: none of these are real secrets — RESEND_API_KEY,
+# BETTER_AUTH_SECRET and CRON_SECRET only need to satisfy src/lib/env.ts's
+# zod validation (format/length), and no job ever sends real e-mail (the e2e
+# job also sets DISABLE_EMAIL_SEND — see tests/e2e/env.ts) or calls a real
+# auth provider. DATABASE_URL is a placeholder in the checks job (pnpm test
+# runs entirely on PGlite; pnpm build never queries the database — see
+# src/db/client.ts) and is overridden for real in the server-postgres job to
+# point at that job's own postgres:17 service container.
+env:
+  DATABASE_URL: postgres://horario:horario@localhost:5432/horario
+  BETTER_AUTH_SECRET: ci-only-not-a-real-secret-needs-32-chars-min
+  BETTER_AUTH_URL: http://localhost:3000
+  RESEND_API_KEY: re_ci_placeholder_not_a_real_key
+  EMAIL_FROM: agendamentos@seudominio.com.br
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  DEMO_EMAIL: demo@horario.app
+  DEMO_PASSWORD: demo12345
+  CRON_SECRET: ci-only-placeholder-16chars
+
+jobs:
+  checks:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      # PGlite-backed — needs no services (see tests/db/harness.ts).
+      - run: pnpm test
+
+      # Never runs migrations at build time (see AGENTS.md / task brief) —
+      # DATABASE_URL above is a placeholder the postgres-js client never
+      # connects to eagerly (src/db/client.ts), so no service container is
+      # needed here.
+      - run: pnpm build
+
+  server-postgres:
+    name: Server Postgres (postgres-js driver, real constraints)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: horario
+          POSTGRES_PASSWORD: horario
+          POSTGRES_DB: horario
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U horario"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://horario:horario@localhost:5432/horario
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Applies the real migration SQL (btree_gist, the EXCLUDE constraint)
+      # to a genuine server Postgres — this is the one driver path (drizzle's
+      # postgres-js) the PGlite-backed suites (pnpm test, pnpm test:e2e)
+      # never exercise.
+      - run: pnpm db:migrate
+
+      - run: pnpm test:db-server
+
+  e2e:
+    name: End-to-end (Playwright, file-backed PGlite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # tests/e2e/prepare-and-start.ts (the webServer this drives) migrates,
+      # seeds and builds against a file-backed PGlite instance itself — no
+      # Docker or Postgres service needed for this job. See tests/e2e/env.ts
+      # for the DATABASE_DRIVER=pglite / DISABLE_EMAIL_SEND /
+      # DISABLE_AUTH_RATE_LIMIT switches it forces for this process tree.
+      - run: pnpm test:e2e
+
+      # playwright.config.ts doesn't configure the html reporter, so this
+      # only ever has content on failure — screenshot ('only-on-failure')
+      # and trace ('retain-on-failure') artifacts land in test-results/.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
