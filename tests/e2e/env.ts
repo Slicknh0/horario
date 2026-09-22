@@ -29,3 +29,10 @@ process.env.DATABASE_DRIVER = 'pglite'
 process.env.PGLITE_DATA_DIR = E2E_PGLITE_DIR
 process.env.DISABLE_EMAIL_SEND = 'true'
 process.env.DISABLE_AUTH_RATE_LIMIT = 'true'
+// This suite runs the app via `next start`, i.e. NODE_ENV=production, by
+// design — otherwise indistinguishable from a real deployment that had
+// DATABASE_DRIVER=pglite set by mistake. This is the deliberate,
+// suite-only acknowledgment src/db/client.ts requires before it will
+// allow that combination instead of throwing at startup — see the
+// comment on E2E_ALLOW_PGLITE_IN_PRODUCTION_MODE in src/lib/env.ts.
+process.env.E2E_ALLOW_PGLITE_IN_PRODUCTION_MODE = 'true'

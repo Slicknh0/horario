@@ -33,6 +33,22 @@ export const env = createEnv({
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    // The one thing that makes DATABASE_DRIVER=pglite safe to combine with
+    // NODE_ENV=production: the e2e suite runs the app via `next start` —
+    // production mode — by design (see playwright.config.ts), which is
+    // otherwise indistinguishable from a real deployment that had
+    // DATABASE_DRIVER=pglite set by mistake. That mistake is silent and
+    // severe (writes land, reads work, the real database never sees any
+    // of it), so src/db/client.ts throws at startup whenever
+    // DATABASE_DRIVER=pglite and NODE_ENV=production unless this flag is
+    // ALSO set — and it is set only by tests/e2e/env.ts, never by
+    // DATABASE_DRIVER or PGLITE_DATA_DIR alone, so a deployment that only
+    // copy-pasted DATABASE_DRIVER=pglite into its real env still trips the
+    // guard. Never set outside the e2e suite.
+    E2E_ALLOW_PGLITE_IN_PRODUCTION_MODE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     DEMO_EMAIL: z.string().email(),
     DEMO_PASSWORD: z.string().min(8),
     CRON_SECRET: z.string().min(16),
