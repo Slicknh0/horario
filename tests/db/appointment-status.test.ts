@@ -145,25 +145,45 @@ const basePayload = {
 // Books through the real action (not a hand-rolled insert) so every
 // appointment this suite transitions has the same shape and provenance a
 // real booking would, and returns the full row so callers can compare it
-// whole later.
+// whole later. A successful booking calls Next's redirect() instead of
+// returning { ok: true, token } (see src/actions/book-appointment.ts) —
+// next-safe-action re-throws it rather than resolving a normal result, so
+// this catches that thrown error and parses the token out of its digest
+// (`${REDIRECT_ERROR_CODE};${type};${url};${statusCode};`, see
+// node_modules/next/dist/client/components/redirect.js) instead of reading
+// `result.data.token` — same pattern as tests/db/booking-action.test.ts and
+// tests/db/cancel-action.test.ts, duplicated rather than shared per this
+// project's own convention (see setupTenant/slotAfter above, already
+// mirrored rather than imported across these three files).
 async function bookAndGetRow(
   tenant: { slug: string },
   service: { id: string },
   startsAt: Date,
 ) {
-  const result = await bookAppointment({
-    slug: tenant.slug,
-    serviceId: service.id,
-    startsAt,
-    ...basePayload,
-  })
-  const data = result?.data as { ok: true; token: string } | undefined
-  if (!data?.ok) throw new Error('setup booking failed unexpectedly')
+  let token: string | undefined
+  try {
+    await bookAppointment({
+      slug: tenant.slug,
+      serviceId: service.id,
+      startsAt,
+      ...basePayload,
+    })
+  } catch (error) {
+    const digest = (error as { digest?: string } | undefined)?.digest
+    if (!digest?.startsWith('NEXT_REDIRECT;')) throw error
+    const url = digest.split(';')[2]
+    if (!url) throw new Error(`redirect digest carried no URL: ${digest}`)
+    token =
+      new URL(url, 'http://localhost').searchParams.get('token') ?? undefined
+  }
+  if (!token) {
+    throw new Error('setup booking failed unexpectedly: no redirect thrown')
+  }
 
   const [row] = await db
     .select()
     .from(appointments)
-    .where(eq(appointments.cancelToken, data.token))
+    .where(eq(appointments.cancelToken, token))
   if (!row) throw new Error('expected the booked appointment row to exist')
   return row
 }
@@ -252,13 +272,8 @@ describe('setAppointmentStatus', () => {
     })
     expect(statusResult?.data).toEqual({ ok: true })
 
-    const rebooked = await bookAppointment({
-      slug: tenant.slug,
-      serviceId: service.id,
-      startsAt,
-      ...basePayload,
-    })
-    expect(rebooked?.data).toMatchObject({ ok: true })
+    const rebooked = await bookAndGetRow(tenant, service, startsAt)
+    expect(rebooked.status).toBe('confirmed')
 
     const rows = await db
       .select()

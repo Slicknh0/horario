@@ -1,6 +1,8 @@
 'use server'
 
 import { randomBytes } from 'node:crypto'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { db } from '@/db/client'
 import { countFutureByPhone, getBusyRanges } from '@/db/queries/appointment'
@@ -174,7 +176,23 @@ export const bookAppointment = publicAction
       console.error('confirmation email failed', { cancelToken, e }),
     )
 
-    return { ok: true as const, token: cancelToken }
+    // The owner's agenda (src/app/app/page.tsx) reads listAppointmentsBetween
+    // through a cached Server Component render — without this, a booking
+    // made seconds ago would not show up until something else happened to
+    // revalidate that path.
+    revalidatePath('/app')
+
+    // next-safe-action explicitly detects and re-throws Next.js navigation
+    // errors (see node_modules/next-safe-action/dist/index.mjs,
+    // isNavigationError) rather than swallowing them as a server error, so
+    // this reaches the browser as a real navigation — the same guarantee a
+    // plain <form action> redirect gets, without BookingFlow ever holding
+    // the token in client state (a page reload used to lose it entirely;
+    // see the class comment on ConfirmadoPage). `redirect` has return type
+    // `never`, so nothing after this line is reachable.
+    redirect(
+      `/b/${parsedInput.slug}/confirmado?token=${encodeURIComponent(cancelToken)}`,
+    )
   })
 
 // Drizzle wraps driver errors in DrizzleQueryError, so the SQLSTATE lives on

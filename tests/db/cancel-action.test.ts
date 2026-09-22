@@ -14,6 +14,12 @@ vi.mock('@/lib/email', () => ({
   sendConfirmationEmail: sendConfirmationEmailMock,
 }))
 
+// bookAppointment calls revalidatePath('/app') right before it redirects
+// (see src/actions/book-appointment.ts and tests/db/booking-action.test.ts
+// for the fuller rationale) — mocked so the fixture-setup bookings below
+// don't need a live Next.js request/render store.
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+
 const { bookAppointment } = await import('@/actions/book-appointment')
 const { cancelAppointment } = await import('@/actions/cancel-appointment')
 const { appointments, services, tenants, weeklyHours } = await import(
@@ -119,21 +125,38 @@ const basePayload = {
 
 // Books through the real action (not a hand-rolled insert) so the token
 // this suite cancels is the same shape and provenance a real customer's
-// would be, and returns it alongside the chosen startsAt for reuse.
+// would be. A successful booking calls Next's redirect() instead of
+// returning { ok: true, token } (see src/actions/book-appointment.ts) —
+// next-safe-action re-throws it rather than resolving a normal result, so
+// this catches that thrown error and parses the token out of its digest
+// (`${REDIRECT_ERROR_CODE};${type};${url};${statusCode};`, see
+// node_modules/next/dist/client/components/redirect.js) instead of reading
+// `result.data.token` — same reasoning as tests/db/booking-action.test.ts's
+// runBooking, duplicated rather than shared across files per this
+// project's own convention (see this file's setupTenant/slotAfter, which
+// already mirror booking-action.test.ts's rather than importing them).
 async function bookAndGetToken(
   tenant: { slug: string },
   service: { id: string },
   startsAt: Date,
 ) {
-  const result = await bookAppointment({
-    slug: tenant.slug,
-    serviceId: service.id,
-    startsAt,
-    ...basePayload,
-  })
-  const data = result?.data as { ok: true; token: string } | undefined
-  if (!data?.ok) throw new Error('setup booking failed unexpectedly')
-  return data.token
+  try {
+    await bookAppointment({
+      slug: tenant.slug,
+      serviceId: service.id,
+      startsAt,
+      ...basePayload,
+    })
+  } catch (error) {
+    const digest = (error as { digest?: string } | undefined)?.digest
+    if (!digest?.startsWith('NEXT_REDIRECT;')) throw error
+    const url = digest.split(';')[2]
+    if (!url) throw new Error(`redirect digest carried no URL: ${digest}`)
+    const token = new URL(url, 'http://localhost').searchParams.get('token')
+    if (!token) throw new Error(`redirect URL carried no token: ${url}`)
+    return token
+  }
+  throw new Error('setup booking failed unexpectedly: no redirect thrown')
 }
 
 describe('cancelAppointment', () => {
@@ -167,13 +190,8 @@ describe('cancelAppointment', () => {
     const cancelResult = await cancelAppointment({ token })
     expect(cancelResult?.data).toEqual({ ok: true })
 
-    const rebooked = await bookAppointment({
-      slug: tenant.slug,
-      serviceId: service.id,
-      startsAt,
-      ...basePayload,
-    })
-    expect(rebooked?.data).toMatchObject({ ok: true })
+    const rebookedToken = await bookAndGetToken(tenant, service, startsAt)
+    expect(typeof rebookedToken).toBe('string')
 
     const rows = await db
       .select()

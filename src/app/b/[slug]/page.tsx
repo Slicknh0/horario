@@ -132,7 +132,6 @@ export default async function BookingPage({
       <BookingFlow
         key={`${selectedService?.id ?? 'none'}-${selectedDate}`}
         slug={slug}
-        tenantName={tenant.name}
         services={services}
         hasAnyWeeklyHours={hasAnyWeeklyHours}
         timezone={tenant.timezone}

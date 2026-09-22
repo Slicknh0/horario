@@ -13,6 +13,13 @@ vi.mock('@/lib/email', () => ({
   sendConfirmationEmail: sendConfirmationEmailMock,
 }))
 
+// bookAppointment calls revalidatePath('/app') right before it redirects
+// (see src/actions/book-appointment.ts) — the real implementation needs a
+// live Next.js request/render store that does not exist when the action is
+// called directly here, outside any request (same reasoning as every other
+// tests/db/*.test.ts file that mocks next/cache).
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+
 const { bookAppointment } = await import('@/actions/book-appointment')
 const { appointments, services, tenants, weeklyHours } = await import(
   '@/db/schema'
@@ -118,20 +125,58 @@ const basePayload = {
   customerPhone: '11999999999',
 }
 
+type BookInput = Parameters<typeof bookAppointment>[0]
+type BookOutcome =
+  | { kind: 'redirected'; token: string }
+  | { kind: 'result'; data: unknown }
+
+// A successful booking calls Next's redirect() instead of returning
+// { ok: true, token } (see src/actions/book-appointment.ts) — next-safe-
+// action explicitly re-throws Next.js navigation errors rather than
+// resolving a normal result (node_modules/next-safe-action/dist/index.mjs,
+// isNavigationError), so success now surfaces here as a specific thrown
+// error, not a return value. The thrown error's `digest` encodes the
+// destination as `${REDIRECT_ERROR_CODE};${type};${url};${statusCode};`
+// (node_modules/next/dist/client/components/redirect.js) — parsed here
+// rather than imported from Next's internals, so this stays correct
+// however that internal module is laid out.
+async function runBooking(input: BookInput): Promise<BookOutcome> {
+  try {
+    const result = await bookAppointment(input)
+    return { kind: 'result', data: result?.data }
+  } catch (error) {
+    const digest = (error as { digest?: string } | undefined)?.digest
+    if (!digest?.startsWith('NEXT_REDIRECT;')) throw error
+    const url = digest.split(';')[2]
+    if (!url) throw new Error(`redirect digest carried no URL: ${digest}`)
+    const token = new URL(url, 'http://localhost').searchParams.get('token')
+    if (!token) throw new Error(`redirect URL carried no token: ${url}`)
+    return { kind: 'redirected', token }
+  }
+}
+
+async function bookAndExpectRedirect(input: BookInput): Promise<string> {
+  const outcome = await runBooking(input)
+  if (outcome.kind !== 'redirected') {
+    throw new Error(
+      `expected bookAppointment to redirect, got: ${JSON.stringify(outcome)}`,
+    )
+  }
+  return outcome.token
+}
+
 describe('bookAppointment', () => {
   test('a valid booking inserts exactly one row, with blocked_until equal to ends_at + buffer', async () => {
     const { tenant, service } = await setupTenant()
     const startsAt = slotAfter(180) // well past the 120-minute default notice
 
-    const result = await bookAppointment({
+    const token = await bookAndExpectRedirect({
       slug: tenant.slug,
       serviceId: service.id,
       startsAt,
       ...basePayload,
     })
-
-    expect(result?.data).toMatchObject({ ok: true })
-    expect(typeof (result?.data as { token?: string })?.token).toBe('string')
+    expect(typeof token).toBe('string')
 
     const rows = await db
       .select()
@@ -191,13 +236,19 @@ describe('bookAppointment', () => {
     // either throw (an unhandled rejection failing this test) or surface a
     // generic serverError instead of the structured result asserted below.
     const [first, second] = await Promise.all([
-      bookAppointment(payload),
-      bookAppointment(payload),
+      runBooking(payload),
+      runBooking(payload),
     ])
 
-    const results = [first?.data, second?.data]
-    expect(results).toContainEqual({ ok: true, token: expect.any(String) })
-    expect(results).toContainEqual({ ok: false, error: 'SLOT_TAKEN' })
+    const outcomes = [first, second]
+    expect(outcomes).toContainEqual({
+      kind: 'redirected',
+      token: expect.any(String),
+    })
+    expect(outcomes).toContainEqual({
+      kind: 'result',
+      data: { ok: false, error: 'SLOT_TAKEN' },
+    })
 
     const rows = await db
       .select()
@@ -225,8 +276,8 @@ describe('bookAppointment', () => {
       ...basePayload,
     }
 
-    const first = await bookAppointment(payload)
-    expect(first?.data).toMatchObject({ ok: true })
+    const token = await bookAndExpectRedirect(payload)
+    expect(typeof token).toBe('string')
 
     const second = await bookAppointment(payload)
     expect(second?.data).toEqual({ ok: false, error: 'SLOT_TAKEN' })
@@ -395,14 +446,14 @@ describe('bookAppointment', () => {
     // constraint on its own.
     for (let i = 0; i < 3; i++) {
       const startsAt = slotAfter(180 + i * 60)
-      const result = await bookAppointment({
+      const token = await bookAndExpectRedirect({
         slug: tenant.slug,
         serviceId: service.id,
         startsAt,
         ...basePayload,
         customerPhone: phone,
       })
-      expect(result?.data).toMatchObject({ ok: true })
+      expect(typeof token).toBe('string')
     }
 
     const fourthStartsAt = slotAfter(180 + 3 * 60)

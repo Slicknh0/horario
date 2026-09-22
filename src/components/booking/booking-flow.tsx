@@ -1,5 +1,6 @@
 'use client'
 
+import type { Route } from 'next'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAction } from 'next-safe-action/hooks'
@@ -14,7 +15,6 @@ import { bookAppointment } from '@/actions/book-appointment'
 import { DateStrip } from '@/components/booking/date-strip'
 import { ServiceCard } from '@/components/booking/service-card'
 import { SlotGrid } from '@/components/booking/slot-grid'
-import { CheckIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,78 +28,11 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 })
 
-function formatStartsAt(startsAt: Date, timezone: string): string {
-  const day = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    timeZone: timezone,
-  }).format(startsAt)
-  const time = new Intl.DateTimeFormat('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: timezone,
-  }).format(startsAt)
-  return `${day} às ${time}`
-}
-
 function EmptyState({ message }: { message: string }) {
   return (
     <p className="rounded-lg border border-border bg-surface p-4 text-sm text-fg-muted">
       {message}
     </p>
-  )
-}
-
-function ConfirmationScreen({
-  slug,
-  tenantName,
-  serviceName,
-  startsAt,
-  timezone,
-  token,
-}: {
-  slug: string
-  tenantName: string
-  serviceName: string
-  startsAt: Date
-  timezone: string
-  token: string
-}) {
-  return (
-    <div className="flex flex-col items-center gap-4 py-10 text-center">
-      <div className="flex size-14 items-center justify-center rounded-full bg-surface-raised text-fg">
-        <CheckIcon className="size-7" />
-      </div>
-      <div>
-        <h2 className="font-display text-xl font-semibold text-fg">
-          Agendamento confirmado
-        </h2>
-        <p className="mt-1 text-sm text-fg-muted">{tenantName}</p>
-      </div>
-      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 text-left">
-        <p className="font-medium text-fg">{serviceName}</p>
-        <p className="tnum text-sm text-fg-muted">
-          {formatStartsAt(startsAt, timezone)}
-        </p>
-      </div>
-      <p className="max-w-sm text-sm text-fg-muted">
-        Enviamos os detalhes para o seu e-mail. Guarde o link abaixo — é por ele
-        que você vê ou cancela o agendamento, sem precisar de conta.
-      </p>
-      <Link
-        href={`/a/${token}`}
-        className="rounded-sm text-sm font-medium text-fg underline underline-offset-2 hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-      >
-        Ver ou cancelar agendamento
-      </Link>
-      <Link
-        href={`/b/${slug}`}
-        className="rounded-sm text-sm text-fg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-      >
-        Fazer outro agendamento
-      </Link>
-    </div>
   )
 }
 
@@ -114,7 +47,6 @@ type DayOption = { date: LocalDate; hasSlots: boolean }
 // across a navigation.
 export function BookingFlow({
   slug,
-  tenantName,
   services,
   hasAnyWeeklyHours,
   timezone,
@@ -125,7 +57,6 @@ export function BookingFlow({
   slots,
 }: {
   slug: string
-  tenantName: string
   services: Service[]
   hasAnyWeeklyHours: boolean
   timezone: string
@@ -160,7 +91,11 @@ export function BookingFlow({
 
   function navigate(href: string) {
     startTransition(() => {
-      router.push(href)
+      // href is built by callers from a runtime slug/date, never a literal
+      // — typedRoutes (next.config.ts) can only statically validate a
+      // literal or literal-composed href, so a plain `string` needs this
+      // cast, per Next's own documented pattern for router.push.
+      router.push(href as Route)
     })
   }
 
@@ -183,17 +118,21 @@ export function BookingFlow({
     navigate(`/b/${slug}`)
   }
 
+  // A real booking never reaches this callback at all: bookAppointment
+  // calls Next's redirect() on success (see src/actions/book-appointment.ts),
+  // which next-safe-action re-throws as a navigation error instead of
+  // resolving a "success" payload — the browser is sent straight to
+  // /b/[slug]/confirmado?token=... before onSuccess would ever fire. So by
+  // construction, `data` here only ever carries a domain error.
   const { execute, result, isExecuting, reset } = useAction(bookAppointment, {
     onSuccess: ({ data }) => {
-      if (!data.ok) {
-        // Never leave a broken/stale selection standing: re-picking a time
-        // is always required after any failure. SLOT_TAKEN specifically
-        // means the day's slot list itself is stale, so that one also
-        // triggers a refetch of the Server Component data (same URL, fresh
-        // props) rather than just a local state reset.
-        setSelectedSlotIso(undefined)
-        if (data.error === 'SLOT_TAKEN') router.refresh()
-      }
+      // Never leave a broken/stale selection standing: re-picking a time is
+      // always required after any failure. SLOT_TAKEN specifically means
+      // the day's slot list itself is stale, so that one also triggers a
+      // refetch of the Server Component data (same URL, fresh props)
+      // rather than just a local state reset.
+      setSelectedSlotIso(undefined)
+      if (data.error === 'SLOT_TAKEN') router.refresh()
     },
   })
 
@@ -232,19 +171,6 @@ export function BookingFlow({
   if (!hasAnyWeeklyHours) {
     return (
       <EmptyState message="Ainda não há horários disponíveis para agendamento." />
-    )
-  }
-
-  if (result.data?.ok && selectedSlotIso) {
-    return (
-      <ConfirmationScreen
-        slug={slug}
-        tenantName={tenantName}
-        serviceName={selectedService?.name ?? ''}
-        startsAt={new Date(selectedSlotIso)}
-        timezone={timezone}
-        token={result.data.token}
-      />
     )
   }
 

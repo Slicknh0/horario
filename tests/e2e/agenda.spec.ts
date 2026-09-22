@@ -53,7 +53,15 @@ test('the owner sees a booking on the agenda and marks a no-show', async ({
   await page.getByLabel('E-mail').fill('agenda.e2e@example.com')
   await page.getByLabel('Telefone (WhatsApp)').fill('11988887777')
   await page.getByRole('button', { name: /confirmar agendamento/i }).click()
-  await expect(page.getByText(/agendamento confirmado/i)).toBeVisible()
+  // Scoped to the heading, not a plain getByText: bookAppointment redirects
+  // to /b/[slug]/confirmado on success (src/actions/book-appointment.ts),
+  // and Next's own route announcer (#__next-route-announcer__) echoes the
+  // new page's h1 text into a second, visible-to-Playwright element after
+  // every client-side navigation — an unscoped text match resolves to both
+  // and fails in strict mode.
+  await expect(
+    page.getByRole('heading', { name: /agendamento confirmado/i }),
+  ).toBeVisible()
 
   await page.goto('/login')
   await page.getByLabel('E-mail').fill(process.env.DEMO_EMAIL as string)
