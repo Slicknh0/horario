@@ -33,12 +33,25 @@ export function DateStrip({
   days,
   selectedDate,
   today,
+  onNavigate,
 }: {
   slug: string
   serviceId: string
   days: { date: LocalDate; hasSlots: boolean }[]
   selectedDate: LocalDate
   today: LocalDate
+  // Called synchronously, in the same click, only when the clicked day
+  // actually differs from the one already selected (a click on the
+  // already-selected day's own link is not a navigation — Next won't
+  // remount BookingFlow for it, so nothing needs to be armed). See the
+  // comment on BookingFlow's `isNavigatingAway` state for what this
+  // closes: Next.js's client-side transition deliberately keeps the
+  // outgoing page interactive while the new one loads (that's what makes
+  // it feel instant), so without this the still-live SlotGrid for the day
+  // being left can register a click for a slot that belongs to the wrong
+  // day, moments before BookingFlow remounts (keyed by day) and silently
+  // discards whatever that click just set.
+  onNavigate?: () => void
 }) {
   return (
     <fieldset className="m-0 border-0 p-0">
@@ -51,6 +64,7 @@ export function DateStrip({
               key={date}
               href={`/b/${slug}?servico=${serviceId}&data=${date}`}
               aria-current={isSelected ? 'date' : undefined}
+              onClick={isSelected ? undefined : onNavigate}
               className={cn(
                 'flex h-16 w-14 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-md border text-sm transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg',

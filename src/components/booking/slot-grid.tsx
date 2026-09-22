@@ -29,11 +29,20 @@ export function SlotGrid({
   timezone,
   value,
   onValueChange,
+  disabled,
 }: {
   slots: Slot[]
   timezone: string
   value: string | undefined
   onValueChange: (iso: string) => void
+  // Set true for the moment between clicking a different day/service and
+  // that navigation actually landing (see the `disabled` prop's own
+  // comment on BookingFlow's SlotGrid usage for the full race this closes).
+  // Radix forwards this straight to the underlying `<button disabled>`, so
+  // Playwright's (and a real browser's) own actionability check already
+  // refuses to click a slot while this is true — no extra synchronization
+  // needed anywhere else.
+  disabled?: boolean
 }) {
   const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit',
@@ -62,6 +71,7 @@ export function SlotGrid({
       aria-label="Horários disponíveis"
       value={value}
       onValueChange={onValueChange}
+      disabled={disabled}
       className="flex flex-col gap-5"
     >
       {groups.map((group) => (
@@ -79,6 +89,7 @@ export function SlotGrid({
                     'hover:bg-surface-raised',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
                     'data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-fg',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
                   )}
                 >
                   {timeFormatter.format(slot.startsAt)}

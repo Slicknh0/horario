@@ -133,6 +133,25 @@ export function BookingFlow({
   const [selectedSlotIso, setSelectedSlotIso] = useState<string | undefined>(
     undefined,
   )
+  // Armed the instant the user clicks a different day or "Trocar" (switch
+  // service) — both change the `key` this component is mounted under (see
+  // the class comment above), so Next will replace this whole instance
+  // once the new Server Component payload lands. Next's client-side
+  // transitions deliberately keep the OUTGOING page fully interactive
+  // while that happens (it's what makes navigation feel instant — see
+  // node_modules/next/dist/docs/01-app/01-getting-started/04-linking-and-navigating.md,
+  // "Client-side transitions": "Keeping any shared layouts and UI"), so
+  // without this a click landing on this still-live SlotGrid in that
+  // window sets `selectedSlotIso` to a slot from the day/service being
+  // left, moments before the remount silently discards it — the customer
+  // sees their tap on a visible, enabled time slot do nothing, forever
+  // (this is what tests/e2e/agenda.spec.ts and booking.spec.ts caught: a
+  // slot click landing on the previous day's still-present grid before the
+  // newly selected day's grid replaced it). A fresh, remounted instance
+  // always starts with this false again, so it never needs to be reset by
+  // hand — the remount that would otherwise lose `selectedSlotIso` is the
+  // exact same event that naturally clears this too.
+  const [isNavigatingAway, setIsNavigatingAway] = useState(false)
 
   const { execute, result, isExecuting, reset } = useAction(bookAppointment, {
     onSuccess: ({ data }) => {
@@ -149,6 +168,13 @@ export function BookingFlow({
   })
 
   function handleSelectSlot(iso: string) {
+    // Defense in depth: SlotGrid's `disabled` prop (driven by
+    // isNavigatingAway) already makes the underlying radio buttons
+    // non-interactive while this is true, so a real click can't reach
+    // here — but onValueChange is a public callback prop, not something
+    // only a mouse click can invoke, so this stays correct regardless of
+    // how it gets called.
+    if (isNavigatingAway) return
     setSelectedSlotIso(iso)
     reset()
   }
@@ -242,6 +268,11 @@ export function BookingFlow({
         </div>
         <Link
           href={`/b/${slug}`}
+          // Always a genuine navigation away (this link only renders once
+          // a service is already selected), unlike DateStrip's own links,
+          // which skip the callback for the already-selected day — see
+          // the comment on `isNavigatingAway` above for what this arms.
+          onClick={() => setIsNavigatingAway(true)}
           className="shrink-0 rounded-sm text-sm text-fg-muted underline underline-offset-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           Trocar
@@ -254,6 +285,7 @@ export function BookingFlow({
         days={dayOptions}
         selectedDate={selectedDate}
         today={today}
+        onNavigate={() => setIsNavigatingAway(true)}
       />
 
       {actionError ? (
@@ -270,6 +302,7 @@ export function BookingFlow({
           timezone={timezone}
           value={selectedSlotIso}
           onValueChange={handleSelectSlot}
+          disabled={isNavigatingAway}
         />
       )}
 
