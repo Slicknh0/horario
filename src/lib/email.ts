@@ -34,6 +34,20 @@ export async function sendConfirmationEmail(input: {
   timezone: string
   cancelToken: string
 }): Promise<void> {
+  // Env-gated no-op: DISABLE_EMAIL_SEND is set only by the Playwright e2e
+  // suite (tests/e2e/env.ts), so that no test run ever makes a real call
+  // to Resend — a fake RESEND_API_KEY would still fail safely, but this
+  // skips the network round-trip entirely and keeps the suite hermetic.
+  // Never set in production. A dedicated flag rather than inferring this
+  // from DATABASE_DRIVER, so this module's own behavior stays legible
+  // without cross-referencing the db driver switch.
+  if (env.DISABLE_EMAIL_SEND) {
+    console.log('sendConfirmationEmail skipped (DISABLE_EMAIL_SEND=true)', {
+      to: input.to,
+    })
+    return
+  }
+
   const when = formatFullDateTime(input.startsAt, input.timezone)
   const manageUrl = cancelUrl(input.cancelToken)
 

@@ -10,8 +10,17 @@
 !.yarn/releases
 !.yarn/versions
 
+
 # testing
 /coverage
+
+# e2e (playwright + the file-backed PGlite instance it runs the app
+# against — see tests/e2e/env.ts, tests/e2e/global-setup.ts)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/.data/
 
 # next.js
 /.next/
