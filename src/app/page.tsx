@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { DemoLoginButton } from '@/components/demo-login-button'
 import { CalendarIcon, CheckIcon, SettingsIcon } from '@/components/icons'
 import { DEMO_TENANT_SLUG } from '@/lib/demo'
+import { env } from '@/lib/env'
 import { cn } from '@/lib/utils'
 
 const PRIMARY_CTA =
@@ -82,6 +84,28 @@ export default function LandingPage() {
             <p className="mt-4 text-sm text-fg-muted">
               Grátis para começar. Sem cartão de crédito.
             </p>
+
+            {/* The public booking demo above is the customer's half of the
+                product. This is the owner's half — the agenda, the paywall,
+                the availability editors — reachable with zero friction: the
+                credentials are printed here AND the button signs in with
+                them directly, so "see it all working without creating an
+                account" (spec §1's own success test) holds for both
+                halves. */}
+            <div className="mt-6 flex flex-col gap-3 rounded-lg border border-border bg-surface px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-fg">
+                  Quer ver o lado do dono?
+                </p>
+                <p className="tnum text-sm text-fg-muted">
+                  Conta de demonstração: {env.DEMO_EMAIL} · {env.DEMO_PASSWORD}
+                </p>
+              </div>
+              <DemoLoginButton
+                email={env.DEMO_EMAIL}
+                password={env.DEMO_PASSWORD}
+              />
+            </div>
           </div>
 
           <div className="w-full rounded-xl border border-border bg-surface p-5">
