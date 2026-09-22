@@ -1,3 +1,4 @@
+import type { Route } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AgendaDay } from '@/components/agenda/agenda-day'
@@ -49,11 +50,16 @@ export default async function AgendaPage({ searchParams }: PageProps<'/app'>) {
 
   const publicUrl = `${env.NEXT_PUBLIC_APP_URL}/b/${tenant.slug}`
 
-  function dayHref(date: LocalDate) {
-    return `/app?data=${date}`
+  // typedRoutes (next.config.ts) only validates a literal `href` string or
+  // one that's a template literal built entirely from other literal types
+  // — a plain `string` return type (what these two would infer without the
+  // cast) doesn't structurally match `Route`, per Next's own documented
+  // pattern for this exact case (non-literal hrefs need `as Route`).
+  function dayHref(date: LocalDate): Route {
+    return `/app?data=${date}` as Route
   }
-  function weekHref(date: LocalDate) {
-    return `/app?view=semana&data=${date}`
+  function weekHref(date: LocalDate): Route {
+    return `/app?view=semana&data=${date}` as Route
   }
 
   if (view === 'semana') {
@@ -180,8 +186,8 @@ function AgendaHeader({
   selectedDate: LocalDate
   today: LocalDate
   timezone: string
-  dayHref: (date: LocalDate) => string
-  weekHref: (date: LocalDate) => string
+  dayHref: (date: LocalDate) => Route
+  weekHref: (date: LocalDate) => Route
 }) {
   const headingInstant = toInstant(selectedDate, 12 * 60, timezone)
   const heading = headingInstant

@@ -1,3 +1,4 @@
+import type { Route } from 'next'
 import Link from 'next/link'
 import type { Service } from '@/db/queries/service'
 import { cn } from '@/lib/utils'
@@ -19,7 +20,9 @@ export function ServiceCard({
 }) {
   return (
     <Link
-      href={href}
+      // Callers always build this from a runtime slug/serviceId, never a
+      // literal — see the `as Route` comment on BookingFlow's `navigate`.
+      href={href as Route}
       className={cn(
         'flex min-h-16 flex-col gap-1 rounded-lg border border-border bg-surface p-4 text-left transition-colors',
         'hover:bg-surface-raised',

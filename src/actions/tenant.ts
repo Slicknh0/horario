@@ -1,13 +1,14 @@
 'use server'
 
 import { eq } from 'drizzle-orm'
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/db/client'
 import { getTenantBySlug } from '@/db/queries/tenant'
 import { tenants, user } from '@/db/schema'
 import { normalizeSlug, validateSlug } from '@/domain/slug'
 import { auth } from '@/lib/auth'
-import { publicAction } from '@/lib/safe-action'
+import { authedAction, publicAction } from '@/lib/safe-action'
 
 const schema = z.object({
   name: z.string().min(2).max(80),
@@ -124,4 +125,55 @@ export const signUpBusiness = publicAction
 
       return { ok: false as const, error: 'SIGNUP_FAILED' as const }
     }
+  })
+
+const CONFIGURACOES_PATH = '/app/configuracoes'
+
+// `Intl.DateTimeFormat` throws `RangeError` for any string that isn't a
+// real IANA zone — the same check the runtime itself performs whenever the
+// timezone is actually used (see src/domain/time.ts), so this can't drift
+// from what "valid" means elsewhere in the app.
+function isValidTimeZone(timezone: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+const tenantSettingsInput = z.object({
+  name: z.string().min(2).max(80),
+  timezone: z
+    .string()
+    .min(1)
+    .max(100)
+    .refine(isValidTimeZone, { message: 'Fuso horário inválido' }),
+  // Bounded generously (up to 14 days) against a malformed client, not a
+  // realistic business need — see the field's own comment below for what it
+  // actually governs.
+  minNoticeMinutes: z.number().int().min(0).max(20_160),
+  maxAdvanceDays: z.number().int().min(1).max(365),
+})
+
+// The one action behind /app/configuracoes. `minNoticeMinutes` is spec'd as
+// a single parameter serving two purposes at once — how far ahead a
+// customer must book (validateBookingWindow) and how late they may cancel
+// (canCancel), see src/domain/booking-window.ts and
+// src/domain/cancellation.ts — so this form's copy has to say both, not just
+// the booking half, or an owner tightening "advance notice" would silently
+// also tighten the cancellation deadline with no warning.
+export const updateTenantSettings = authedAction
+  .inputSchema(tenantSettingsInput)
+  .action(async ({ parsedInput, ctx }) => {
+    // Scoped by ctx.tenantId (from the verified session), never by an id
+    // taken from input — there is no id in this form at all, only the
+    // caller's own tenant.
+    await db
+      .update(tenants)
+      .set(parsedInput)
+      .where(eq(tenants.id, ctx.tenantId))
+
+    revalidatePath(CONFIGURACOES_PATH)
+    return { ok: true as const }
   })

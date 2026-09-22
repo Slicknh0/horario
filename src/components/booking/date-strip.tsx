@@ -1,3 +1,4 @@
+import type { Route } from 'next'
 import Link from 'next/link'
 import type { MouseEvent } from 'react'
 import type { LocalDate } from '@/domain/types'
@@ -79,7 +80,10 @@ export function DateStrip({
           return (
             <Link
               key={date}
-              href={href}
+              // Built from a runtime slug/serviceId/date, never a literal
+              // — see the `as Route` comment on BookingFlow's `navigate`
+              // for why typedRoutes needs this cast here too.
+              href={href as Route}
               aria-current={isSelected ? 'date' : undefined}
               onClick={handleClick}
               className={cn(
