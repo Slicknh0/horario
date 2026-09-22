@@ -121,3 +121,11 @@ export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
     </BaseIcon>
   )
 }
+
+export function LogOutIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M8 3H5.5A1.5 1.5 0 0 0 4 4.5v11A1.5 1.5 0 0 0 5.5 17H8M13 13.5l3.5-3.5L13 6.5M16.2 10H8" />
+    </BaseIcon>
+  )
+}

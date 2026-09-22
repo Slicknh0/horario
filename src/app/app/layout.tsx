@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { AppNav } from '@/components/app-nav'
 import { CopyLinkButton } from '@/components/copy-link-button'
+import { SignOutButton } from '@/components/sign-out-button'
 import { getTenantById } from '@/db/queries/tenant'
 import { getSession } from '@/lib/auth'
 import { env } from '@/lib/env'
@@ -31,24 +32,28 @@ export default async function AppLayout({ children }: LayoutProps<'/app'>) {
 
         <AppNav />
 
-        <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-4 md:mt-0">
-          <span className="text-xs font-medium text-fg-muted">
-            Link público
-          </span>
-          <div className="flex items-center gap-2">
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(
-                'truncate rounded-sm text-sm text-fg-muted transition-colors hover:text-fg hover:underline',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
-              )}
-            >
-              {publicUrlDisplay}
-            </a>
-            <CopyLinkButton url={publicUrl} />
+        <div className="mt-auto flex flex-col gap-4 border-t border-border pt-4 md:mt-0">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-fg-muted">
+              Link público
+            </span>
+            <div className="flex items-center gap-2">
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  'truncate rounded-sm text-sm text-fg-muted transition-colors hover:text-fg hover:underline',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+                )}
+              >
+                {publicUrlDisplay}
+              </a>
+              <CopyLinkButton url={publicUrl} />
+            </div>
           </div>
+
+          <SignOutButton />
         </div>
       </aside>
 
