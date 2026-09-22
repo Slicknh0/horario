@@ -77,6 +77,12 @@ function contrastRatio(a: Oklch, b: Oklch): number {
 }
 
 const AA_NORMAL_TEXT = 4.5
+// WCAG 1.4.11 (Non-text Contrast): the minimum for a UI component's visual
+// boundary — an input's border against the surface it sits on, not text.
+// Lower than AA_NORMAL_TEXT on purpose; conflating the two thresholds is
+// exactly what let --color-border ship at 1.38:1 (see the "boundary" tests
+// below) undetected — this file only ever measured text-on-background.
+const AA_UI_BOUNDARY = 3
 
 describe('design tokens: WCAG contrast', () => {
   const tokens = readTokens()
@@ -86,6 +92,7 @@ describe('design tokens: WCAG contrast', () => {
       'bg',
       'surface',
       'surface-raised',
+      'border',
       'fg',
       'fg-muted',
       'accent',
@@ -219,6 +226,70 @@ describe('design tokens: WCAG contrast', () => {
     if (!fgMuted || !surfaceRaised) throw new Error('tokens not loaded')
     expect(contrastRatio(fgMuted, surfaceRaised)).toBeGreaterThanOrEqual(
       AA_NORMAL_TEXT,
+    )
+  })
+
+  // README.md claimed every pair actually used in code was measured, but
+  // `accent` on `surface` (the landing page's feature-icon chips are one
+  // call site; a selected slot's own border sits on `surface` too) and
+  // `accent` on `surface-raised` (e.g. the agenda's selected-day nav pill)
+  // were never pinned. Both pass comfortably (9.15:1 and 8.22:1) — adding
+  // them here is the fix, not softening the README's claim.
+  test('accent on surface >= 4.5:1', () => {
+    const accent = tokens.accent
+    const surface = tokens.surface
+    if (!accent || !surface) throw new Error('tokens not loaded')
+    expect(contrastRatio(accent, surface)).toBeGreaterThanOrEqual(
+      AA_NORMAL_TEXT,
+    )
+  })
+
+  test('accent on surface-raised >= 4.5:1', () => {
+    const accent = tokens.accent
+    const surfaceRaised = tokens['surface-raised']
+    if (!accent || !surfaceRaised) throw new Error('tokens not loaded')
+    expect(contrastRatio(accent, surfaceRaised)).toBeGreaterThanOrEqual(
+      AA_NORMAL_TEXT,
+    )
+  })
+})
+
+// Non-text pairs: a UI component's own visual boundary (WCAG 1.4.11), not
+// text-on-background — 3:1 is the correct threshold here, not 4.5:1. Every
+// text input in the app is `border border-border bg-surface`
+// (src/components/ui/input.tsx), and on the booking form that surface sits
+// inside a card that is itself `bg-surface` — so `--color-border` against
+// `--color-surface` is the line that has to hold up on its own, with
+// nothing else distinguishing the field from its container.
+describe('design tokens: WCAG non-text (UI boundary) contrast', () => {
+  const tokens = readTokens()
+
+  test('border on surface >= 3:1', () => {
+    const border = tokens.border
+    const surface = tokens.surface
+    if (!border || !surface) throw new Error('tokens not loaded')
+    expect(contrastRatio(border, surface)).toBeGreaterThanOrEqual(
+      AA_UI_BOUNDARY,
+    )
+  })
+
+  test('border on bg >= 3:1', () => {
+    const border = tokens.border
+    const bg = tokens.bg
+    if (!border || !bg) throw new Error('tokens not loaded')
+    expect(contrastRatio(border, bg)).toBeGreaterThanOrEqual(AA_UI_BOUNDARY)
+  })
+
+  // Not load-bearing for any component today (nothing puts a border
+  // directly on surface-raised), but cheap to pin now that the boundary
+  // threshold exists, so a future component built there inherits a
+  // guarantee instead of an assumption.
+  test('border on surface-raised >= 3:1', () => {
+    const border = tokens.border
+    const surfaceRaised = tokens['surface-raised']
+    if (!border || !surfaceRaised) throw new Error('tokens not loaded')
+    expect(contrastRatio(border, surfaceRaised)).toBeGreaterThanOrEqual(
+      AA_UI_BOUNDARY,
     )
   })
 })

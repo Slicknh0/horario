@@ -4,7 +4,14 @@
   --color-bg: oklch(14% 0.008 60);
   --color-surface: oklch(18% 0.009 60);
   --color-surface-raised: oklch(23% 0.01 60);
-  --color-border: oklch(30% 0.01 60);
+  /* 53% L (up from the original 30%, ~1.38:1) clears WCAG 1.4.11's 3:1
+     non-text minimum against both --color-surface and --color-bg — see
+     the "boundary" pairs in tests/design/contrast.test.ts, which is what
+     caught the original value. Every text input is border+bg-surface
+     (src/components/ui/input.tsx), and on the booking form that surface
+     sits inside a card that is itself bg-surface: the border was the ONLY
+     thing distinguishing the field from its container. */
+  --color-border: oklch(53% 0.01 60);
   --color-fg: oklch(97% 0.005 80);
   --color-fg-muted: oklch(72% 0.012 70);
   --color-accent: oklch(78% 0.155 70);
