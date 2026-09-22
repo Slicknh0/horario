@@ -29,6 +29,32 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
+  // Spec §7: "/b/[slug] é mobile-first: CTA fixo no rodapé, alvos de toque
+  // ≥44px, grade de slots legível sem zoom." Until now nothing ever
+  // rendered that surface at anything but the desktop-shaped default
+  // viewport (1280x720) — the mobile-first claim was unverified. booking.
+  // spec.ts (the customer-facing, mobile-first flow) runs under the 390x844
+  // project below; agenda.spec.ts (desktop-first: it logs into /app, which
+  // is explicitly NOT mobile-first per spec §7) keeps running at the
+  // default desktop viewport. Splitting by project rather than adding a
+  // second viewport to every spec keeps the total test count at 3, matching
+  // README.md.
+  projects: [
+    {
+      name: 'desktop',
+      testMatch: 'agenda.spec.ts',
+      use: { viewport: { width: 1280, height: 720 } },
+    },
+    {
+      name: 'mobile-390',
+      testMatch: 'booking.spec.ts',
+      use: {
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+  ],
   webServer: {
     // Not `globalSetup`: Playwright starts `webServer` and runs
     // `globalSetup` concurrently, not sequentially (see
