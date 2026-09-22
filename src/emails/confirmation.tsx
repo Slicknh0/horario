@@ -55,7 +55,6 @@ export function ConfirmationEmail({
             the text it's hiding. */}
         <div
           style={{
-            display: 'none',
             overflow: 'hidden',
             lineHeight: '1px',
             opacity: 0,
