@@ -108,4 +108,57 @@ describe('appointment_no_overlap', () => {
       }),
     ).rejects.toMatchObject({ cause: { code: '23514' } })
   })
+
+  // drizzle/0003_ends_after_starts_check.sql: without this CHECK, a
+  // degenerate row (ends_at <= starts_at) produces an EMPTY tstzrange —
+  // '[t, t)' overlaps nothing, by definition — so appointment_no_overlap
+  // (an EXCLUDE constraint) would silently accept it no matter how many
+  // other confirmed appointments already occupy that instant. Only an
+  // application-level rule in a different file (durationMinutes: min(5) in
+  // src/actions/service.ts) prevented this before; this proves the
+  // database itself now refuses it, independent of any call site
+  // remembering to check.
+  test('rejects ends_at equal to starts_at (degenerate zero-length appointment)', async () => {
+    const start = new Date('2026-03-13T12:00:00Z')
+    await expect(
+      db.insert(appointments).values({
+        tenantId,
+        serviceId,
+        status: 'confirmed',
+        customerName: 'Cliente',
+        customerEmail: 'c@ex.com',
+        customerPhone: '11999999999',
+        startsAt: start,
+        endsAt: start,
+        blockedUntil: start,
+        serviceName: 'Corte',
+        durationMinutes: 0,
+        bufferMinutes: 0,
+        priceCents: 5000,
+        cancelToken: 'tok-8',
+      }),
+    ).rejects.toMatchObject({ cause: { code: '23514' } })
+  })
+
+  test('rejects ends_at earlier than starts_at', async () => {
+    const start = new Date('2026-03-14T12:00:00Z')
+    await expect(
+      db.insert(appointments).values({
+        tenantId,
+        serviceId,
+        status: 'confirmed',
+        customerName: 'Cliente',
+        customerEmail: 'c@ex.com',
+        customerPhone: '11999999999',
+        startsAt: start,
+        endsAt: new Date(start.getTime() - 60_000),
+        blockedUntil: start,
+        serviceName: 'Corte',
+        durationMinutes: -1,
+        bufferMinutes: 0,
+        priceCents: 5000,
+        cancelToken: 'tok-9',
+      }),
+    ).rejects.toMatchObject({ cause: { code: '23514' } })
+  })
 })
