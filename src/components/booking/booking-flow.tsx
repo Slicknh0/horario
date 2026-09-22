@@ -81,7 +81,7 @@ function ConfirmationScreen({
         que você vê ou cancela o agendamento, sem precisar de conta.
       </p>
       <Link
-        href={`/cancelar/${token}`}
+        href={`/a/${token}`}
         className="rounded-sm text-sm font-medium text-fg underline underline-offset-2 hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
       >
         Ver ou cancelar agendamento
