@@ -21,7 +21,7 @@ pnpm test:e2e   # 3 testes, sobe o Next real + browser real sobre um PGlite desc
 
 ### O banco impede sobreposição — a aplicação não decide isso
 
-Nenhum agendamento confirmado pode se sobrepor a outro, e quem garante isso é o Postgres, não uma checagem em código. A tabela `appointment` tem uma constraint `EXCLUDE USING gist` sobre `tstzrange(starts_at, blocked_until)`, particionada por `tenant_id` e parcial em `status = 'confirmed'`. A alternativa óbvia — `SELECT` para checar conflito, depois `INSERT` — tem uma janela de corrida: duas requisições simultâneas podem checar "livre" ao mesmo tempo e as duas inserirem. A constraint fecha essa janela no nível que realmente importa, o commit da transação, e como efeito colateral cancelar um agendamento vira só uma troca de `status`: o horário se libera sozinho, sem nenhum código de "devolver o slot" para ficar dessincronizado do resto.
+Nenhum agendamento confirmado pode se sobrepor a outro, e quem garante isso é o Postgres, não uma checagem em código. A tabela `appointment` tem uma constraint `EXCLUDE USING gist` sobre `tstzrange(starts_at, blocked_until)`, casada por `tenant_id` (o elemento `WITH =`) e parcial em `status = 'confirmed'` (a cláusula `WHERE`). A alternativa óbvia — `SELECT` para checar conflito, depois `INSERT` — tem uma janela de corrida: duas requisições simultâneas podem checar "livre" ao mesmo tempo e as duas inserirem. A constraint fecha essa janela no nível que realmente importa, o commit da transação, e como efeito colateral cancelar um agendamento vira só uma troca de `status`: o horário se libera sozinho, sem nenhum código de "devolver o slot" para ficar dessincronizado do resto.
 
 ### Por que não é uma coluna gerada
 
