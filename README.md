@@ -90,15 +90,15 @@ pnpm lint
 pnpm build
 ```
 
-Para rodar o app de verdade com `pnpm dev`, é preciso um Postgres real. O repositório inclui um `docker-compose.yml` para quem tem Docker disponível; **esta máquina não tem Docker instalado**, então o caminho usado aqui foi apontar `DATABASE_URL` (em `.env`, a partir de `.env.example`) para um Postgres remoto:
+Para rodar o app de verdade com `pnpm dev`, é preciso um Postgres real. O repositório inclui um `docker-compose.yml` para quem tem Docker disponível:
 
 ```bash
 # com Docker disponível:
 docker compose up -d
 
-# sem Docker (o caminho usado neste ambiente): aponte DATABASE_URL em .env
-# para um Postgres remoto (Neon, Supabase, Railway, RDS — qualquer um serve,
-# o driver padrão é postgres-js puro)
+# sem Docker: aponte DATABASE_URL em .env (a partir de .env.example) para
+# um Postgres remoto (Neon, Supabase, Railway, RDS — qualquer um serve, o
+# driver padrão é postgres-js puro)
 
 pnpm db:migrate
 pnpm seed
