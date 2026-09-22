@@ -1,6 +1,6 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Locator, type Page, test } from '@playwright/test'
 
-// Picks the first day in the strip (src/components/booking/date-strip.tsx)
+// Finds the first day in the strip (src/components/booking/date-strip.tsx)
 // that isn't marked "cheio" (fully booked / closed) — skipping index 0,
 // "Hoje", so the booking lands on a future day the way a real customer
 // browsing ahead would. DateStrip renders every day as a Link (role
@@ -17,7 +17,10 @@ import { expect, type Page, test } from '@playwright/test'
 // locator matches those too and, evaluated before the service pick's
 // client-side navigation has settled, can resolve to a service link
 // instead of a date link.
-async function pickAnOpenFutureDay(page: Page): Promise<void> {
+//
+// Returns the locator rather than clicking it — the re-click regression
+// test below needs to interact with it more than once.
+async function findAnOpenFutureDayLink(page: Page): Promise<Locator> {
   const dateStrip = page.getByRole('group', { name: 'Escolha o dia' })
   await expect(dateStrip).toBeVisible()
   const dateLinks = dateStrip.getByRole('link')
@@ -25,12 +28,14 @@ async function pickAnOpenFutureDay(page: Page): Promise<void> {
   for (let i = 1; i < count; i++) {
     const link = dateLinks.nth(i)
     const text = (await link.textContent()) ?? ''
-    if (!text.toLowerCase().includes('cheio')) {
-      await link.click()
-      return
-    }
+    if (!text.toLowerCase().includes('cheio')) return link
   }
   throw new Error('no open future day found in the date strip')
+}
+
+async function pickAnOpenFutureDay(page: Page): Promise<void> {
+  const link = await findAnOpenFutureDayLink(page)
+  await link.click()
 }
 
 test('a customer books and receives a working management link', async ({
@@ -84,4 +89,73 @@ test('a customer books and receives a working management link', async ({
   await expect(
     page.getByRole('button', { name: /cancelar agendamento/i }),
   ).toBeVisible()
+})
+
+// Regression test for a Critical bug found (and fixed) in this same round:
+// BookingFlow used to track "a day/service navigation is in flight" with a
+// hand-set useState flag, armed on click and relying entirely on
+// BookingFlow's own remount (its `key` changes on day/service change) to
+// clear it. That reset path never fires for a second click on the SAME day
+// while its own navigation is still pending — no key change has happened
+// yet, so nothing remounts — which left the flag (and therefore every slot
+// in the grid) permanently disabled until a hard reload. The fix
+// (src/components/booking/booking-flow.tsx) replaced the hand-tracked flag
+// with React's own useTransition: `isPending` is guaranteed to resolve
+// once the transition it's tracking settles, no matter how many times
+// startTransition is called again for the same or a different target
+// while it's pending, and no matter what settles it.
+//
+// See also: Back-button-during-a-pending-transition is the other scenario
+// this bug class covers, and this suite does NOT have a test for it.
+// Confirmed deliberately, not by omission: `router.push()` inside
+// startTransition does not update `location.href` synchronously (verified
+// directly — clicking a day link and reading `location.href` in the very
+// same synchronous script still showed the pre-click URL), so there is no
+// externally observable moment between "the push was requested" and "the
+// push's own history update landed" that a test could reliably act on to
+// inject a Back press inside that specific window — by the time any
+// Playwright action (even a raw same-tick page.evaluate()) can act again,
+// the push has typically already completed. A test that merely clicks a
+// day and then calls page.goBack() afterward would not exercise the
+// pending case at all; it would pass whether or not the underlying fix
+// works, which is worse than no test. The re-click case below IS
+// deterministically drivable (a double-click's two events are guaranteed
+// to both land before either one's own navigation completes) and exercises
+// the same underlying guarantee (`isPending` must resolve to false once
+// the transition — however many times it was (re)started — actually
+// settles), which is what makes it a meaningful regression test for this
+// bug class even without a dedicated Back scenario.
+test('re-clicking the same day while its navigation is in flight still leaves a bookable grid', async ({
+  page,
+}) => {
+  await page.goto('/b/barbearia-do-ze')
+  await page
+    .getByRole('link', { name: /^Corte\b/ })
+    .first()
+    .click()
+
+  const dayLink = await findAnOpenFutureDayLink(page)
+
+  // A double-click dispatches two real click events close together — the
+  // second lands while the first's own startTransition(() =>
+  // router.push(...)) may still be pending (BookingFlow's key hasn't
+  // changed yet, since the new day's Server Component payload hasn't
+  // arrived), which is exactly the "re-click while in flight" case: two
+  // requests to navigate to the SAME day in quick succession, neither of
+  // which produces a remount to fall back on for resetting anything.
+  await dayLink.dblclick()
+
+  // The grid must not come out of this permanently disabled. Playwright's
+  // own auto-waiting `click()` below waits out whatever pending window is
+  // left (SlotGrid's radios are genuinely `disabled` while isPending is
+  // true — see slot-grid.tsx) and only clicks once a real, enabled radio
+  // exists — which only happens once the transition has actually settled.
+  await page.getByRole('radio').first().click()
+  await page.getByLabel('Nome completo').fill('Cliente Reclique')
+  await page.getByLabel('E-mail').fill('cliente.reclique@example.com')
+  await page.getByLabel('Telefone (WhatsApp)').fill('11999990002')
+  await page.getByRole('button', { name: /confirmar agendamento/i }).click()
+
+  // The flow must still fully advance, not just "a click was accepted".
+  await expect(page.getByText(/agendamento confirmado/i)).toBeVisible()
 })

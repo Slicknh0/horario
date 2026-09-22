@@ -1,6 +1,7 @@
 import Link from 'next/link'
+import type { MouseEvent } from 'react'
 import type { LocalDate } from '@/domain/types'
-import { cn } from '@/lib/utils'
+import { cn, isPlainLeftClick } from '@/lib/utils'
 
 const WEEKDAY_LABELS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 
@@ -40,18 +41,20 @@ export function DateStrip({
   days: { date: LocalDate; hasSlots: boolean }[]
   selectedDate: LocalDate
   today: LocalDate
-  // Called synchronously, in the same click, only when the clicked day
-  // actually differs from the one already selected (a click on the
-  // already-selected day's own link is not a navigation — Next won't
-  // remount BookingFlow for it, so nothing needs to be armed). See the
-  // comment on BookingFlow's `isNavigatingAway` state for what this
-  // closes: Next.js's client-side transition deliberately keeps the
-  // outgoing page interactive while the new one loads (that's what makes
-  // it feel instant), so without this the still-live SlotGrid for the day
-  // being left can register a click for a slot that belongs to the wrong
-  // day, moments before BookingFlow remounts (keyed by day) and silently
-  // discards whatever that click just set.
-  onNavigate?: () => void
+  // Called synchronously, in the same click, with the href being navigated
+  // to — but only for a plain left click on a day that actually differs
+  // from the one already selected (clicking the already-selected day, or
+  // a modified click meant to open a new tab/download, isn't something
+  // the caller needs to know about). The caller is expected to drive its
+  // own `startTransition(() => router.push(href))` from this — see the
+  // comment on BookingFlow's `isPending` (from `useTransition`) for why:
+  // Next.js's client-side transitions deliberately keep the outgoing page
+  // interactive while the new one loads (that's what makes navigation
+  // feel instant), so without some pending signal the still-live SlotGrid
+  // for the day being left can register a click for a slot that belongs
+  // to the wrong day, moments before BookingFlow remounts (keyed by day)
+  // and silently discards whatever that click just set.
+  onNavigate?: (href: string) => void
 }) {
   return (
     <fieldset className="m-0 border-0 p-0">
@@ -59,12 +62,26 @@ export function DateStrip({
       <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1">
         {days.map(({ date, hasSlots }) => {
           const isSelected = date === selectedDate
+          const href = `/b/${slug}?servico=${serviceId}&data=${date}`
+          function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+            // No callback wired up, already on this day (Next won't even
+            // push a new history entry for it, so there's nothing to
+            // track), or a modified click (new tab, download, etc.):
+            // deliberately NOT calling preventDefault() in any of these
+            // cases leaves it to next/link's own click handling (plain
+            // href-based navigation, or — for a modified click — its own
+            // independent recognition of the same condition, so nothing
+            // double-fires either way).
+            if (!onNavigate || isSelected || !isPlainLeftClick(event)) return
+            event.preventDefault()
+            onNavigate(href)
+          }
           return (
             <Link
               key={date}
-              href={`/b/${slug}?servico=${serviceId}&data=${date}`}
+              href={href}
               aria-current={isSelected ? 'date' : undefined}
-              onClick={isSelected ? undefined : onNavigate}
+              onClick={handleClick}
               className={cn(
                 'flex h-16 w-14 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-md border text-sm transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
