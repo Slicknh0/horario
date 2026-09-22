@@ -25,6 +25,18 @@ import { migrate } from 'drizzle-orm/pglite/migrator'
 // the parent playwright.config.ts process already did.
 import { E2E_PGLITE_DIR } from './env'
 
+// Every child process below is spawned with `shell: true` and every
+// argument that follows is a hardcoded string literal ('pnpm', 'seed',
+// 'start', etc.) — never interpolated from user input, an env var, or
+// anything else outside this file. `shell: true` is required on Windows:
+// `pnpm` resolves to a `.cmd`/`.ps1` shim there, and Node's
+// child_process refuses to exec a shim directly without a shell (see
+// Node's own ENOENT-on-Windows-without-shell documentation). Do not "fix"
+// this by dropping `shell: true` — that breaks Windows — and do not
+// start passing dynamic/interpolated values as args without re-adding
+// escaping; the `shell: true` security warning Node prints
+// (DEP0190/CVE-class shell-injection risk) applies to unescaped
+// *variable* input, not to these fixed literals.
 async function main(): Promise<void> {
   // A fresh database every run: booking.spec.ts and agenda.spec.ts each
   // create their own appointments, and re-running against yesterday's
