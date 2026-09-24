@@ -1,0 +1,14 @@
+# Biome (biome.json) requires LF. Without this, Git on Windows with
+# core.autocrlf=true checks files out as CRLF and `pnpm lint` fails on a
+# fresh clone before anyone has changed a line.
+* text=auto eol=lf
+
+# Binary assets: never touch their bytes.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
