@@ -97,6 +97,10 @@ cp .env.example .env   # os scripts abaixo leem o .env automaticamente
 
 # Opção A — Docker:
 docker compose up -d
+# Se já existe um Postgres instalado na máquina, ele ocupa a 5432 — e no
+# Windows o Docker publica a mesma porta sem erro, deixando este container
+# inalcançável. Nesse caso: POSTGRES_PORT=5433 docker compose up -d, e use
+# :5433 no DATABASE_URL do .env.
 
 # Opção B — Postgres instalado na máquina (testado com o 18): crie a role e o
 # banco que o .env.example espera, como superusuário:

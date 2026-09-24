@@ -6,7 +6,11 @@ services:
       POSTGRES_PASSWORD: horario
       POSTGRES_DB: horario
     ports:
-      - "5432:5432"
+      # Host port is configurable: a Postgres already installed on the machine
+      # usually owns 5432, and on Windows Docker binds it anyway without an
+      # error, silently shadowing this container. Use POSTGRES_PORT=5433 and
+      # the same port in DATABASE_URL when that is the case.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - horario_pgdata:/var/lib/postgresql/data
 
