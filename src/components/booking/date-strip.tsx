@@ -58,7 +58,12 @@ export function DateStrip({
   onNavigate?: (href: string) => void
 }) {
   return (
-    <fieldset className="m-0 border-0 p-0">
+    // min-w-0 is load-bearing: browsers give <fieldset> a default
+    // min-inline-size of min-content, so without it the fieldset refuses to
+    // shrink below its whole row of days, the overflow-x-auto strip inside
+    // never scrolls, and the entire page widens instead — which on a phone
+    // zooms the booking page out until the slot grid is unreadable.
+    <fieldset className="m-0 min-w-0 border-0 p-0">
       <legend className="sr-only">Escolha o dia</legend>
       <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1">
         {days.map(({ date, hasSlots }) => {

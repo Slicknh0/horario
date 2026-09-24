@@ -38,47 +38,37 @@ async function pickAnOpenFutureDay(page: Page): Promise<void> {
   await link.click()
 }
 
-// Clicks the fixed-position "Confirmar agendamento" button via the DOM's
-// own click() instead of Playwright's coordinate-based pointer dispatch.
+// Spec §7: the booking page must never scroll horizontally on a phone. When
+// it does, the phone zooms the whole page out to fit — which is how this was
+// found, on a real iPhone: the date strip's <fieldset> refused to shrink
+// below its row of days (browsers give fieldsets min-inline-size:
+// min-content), the document grew to ~960px, and the slot grid rendered
+// tiny after the first day was picked.
 //
-// Root cause, confirmed by direct repro against this exact page under the
-// 390x844 mobile project: Next.js 16's App Router removes and recreates the
-// <meta name="viewport"> element on every client-side navigation (verified
-// by tagging the original node and observing the tag identity change after
-// a Link click) — this happens for BOTH the implicit default and an
-// explicit static `viewport` export (src/app/layout.tsx has the latter).
-// A browser only honors that tag as parsed with the INITIAL document, never
-// a dynamically reinserted one (this is documented, unresolved upstream
-// behavior — see https://github.com/vercel/next.js/discussions/56554,
-// "PWA Pinch to Zoom Must be Disabled" reports the same symptom). Once lost,
-// Chromium's mobile layout viewport does not recover — not from an
-// identical tag re-added moments later, not from a fresh
-// page.setViewportSize() call — it falls back to its ~980px
-// "not-mobile-optimized" layout viewport for the rest of the document's
-// life, roughly 50ms after the navigation that triggered it (confirmed by
-// sampling window.innerWidth at increasing delays).
-//
-// The app's own CSS is not at fault: document.elementFromPoint resolves
-// correctly to this exact button when queried in the same (skewed) layout
-// coordinate space browser-side. The mismatch is specific to `position:
-// fixed` elements — their rect is reported in the desynced LAYOUT viewport
-// while CDP's synthetic pointer dispatch targets the VISUAL viewport,
-// which is exactly why every other (non-fixed) element in this flow (day
-// links, the slot radio) keeps clicking fine after the same desync, and
-// only this fixed bottom bar's button does not. A real touchscreen's own
-// touch-to-CSS-pixel mapping handles a pinch-zoomed page natively, so this
-// is believed to be a Playwright/CDP-specific gap rather than something a
-// real phone user would hit — but the underlying viewport-desync (the page
-// silently rendering zoomed out after any in-flow navigation) is real and
-// worth follow-up, since spec §7 requires the slot grid stay "legível sem
-// zoom". Dispatching the click via the DOM directly sidesteps the
-// coordinate-space mismatch without touching application code for a defect
-// that isn't in the application.
+// Compared against the configured device width, NOT clientWidth: once the
+// content overflows, mobile Chromium widens its layout viewport to fit, so
+// clientWidth grows with the bug and a clientWidth check passes right
+// through it.
+async function expectNoHorizontalOverflow(page: Page, step: string) {
+  const deviceWidth = page.viewportSize()?.width
+  if (!deviceWidth) throw new Error('no viewport configured for this project')
+  const documentWidth = await page.evaluate(
+    () => document.documentElement.scrollWidth,
+  )
+  expect(
+    documentWidth,
+    `the page is wider than the ${deviceWidth}px screen ${step}`,
+  ).toBeLessThanOrEqual(deviceWidth)
+}
+
+// A real pointer click at the button's coordinates — the fixed bottom bar is
+// exactly what a thumb reaches for. This once had to be a DOM click(),
+// because the widened page (see expectNoHorizontalOverflow) left the layout
+// viewport at ~960px and the fixed button's rect no longer matched where a
+// pointer landed; that was blamed at the time on Next re-inserting the
+// viewport meta tag, which it was not.
 async function clickConfirmar(page: Page): Promise<void> {
-  const button = page.getByRole('button', { name: /confirmar agendamento/i })
-  await expect(button).toBeVisible()
-  await expect(button).toBeEnabled()
-  await button.evaluate((el: HTMLElement) => el.click())
+  await page.getByRole('button', { name: /confirmar agendamento/i }).click()
 }
 
 test('a customer books and receives a working management link', async ({
@@ -103,8 +93,21 @@ test('a customer books and receives a working management link', async ({
     .getByRole('link', { name: /^Corte\b/ })
     .first()
     .click()
+  await expect(page.getByRole('group', { name: 'Escolha o dia' })).toBeVisible()
+  await expectNoHorizontalOverflow(page, 'after choosing a service')
 
   await pickAnOpenFutureDay(page)
+  await expect(page.getByRole('radio').first()).toBeVisible()
+  await expectNoHorizontalOverflow(page, 'after choosing a day')
+
+  // The days that do not fit must still be reachable — by scrolling the
+  // strip itself, not the page.
+  const strip = page.getByRole('group', { name: 'Escolha o dia' })
+  const stripScrolls = await strip
+    .locator('div')
+    .first()
+    .evaluate((el) => el.scrollWidth > el.clientWidth)
+  expect(stripScrolls, 'the date strip should scroll on its own').toBe(true)
 
   // Slots are a Radix radiogroup (role "radio" per item) — the one part
   // of the brief's selector sketch that already matched the real DOM.

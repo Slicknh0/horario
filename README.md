@@ -66,6 +66,12 @@ Testes unitários e de integração provam que cada peça funciona isolada. O qu
 
 Nenhum desses quatro apareceria numa suíte que só chama funções puras ou faz `INSERT`/`SELECT` direto no banco. É exatamente para isso que a camada de ponta a ponta existe.
 
+### E um que a própria suíte deixou passar
+
+No primeiro teste num iPhone de verdade, a página de agendamento **encolhia inteira** logo depois de escolher o dia — a grade de horários ficava minúscula. A causa: a faixa de dias fica dentro de um `<fieldset>`, e o navegador dá a todo `fieldset` um `min-inline-size: min-content` por padrão. Ele se recusava a ficar mais estreito que a fileira inteira de dias (~920px), a rolagem interna nunca acontecia, e quem alargava era a página — que o celular então reduzia para caber. A correção foi uma classe: `min-w-0`.
+
+A suíte rodava esse fluxo em 390px e passava, porque nenhum teste media largura. E medir contra `clientWidth` não teria bastado: o Chromium mobile *aumenta* o viewport de layout junto com o conteúdo que transborda, então essa comparação passaria por cima do bug. O teste compara a largura do documento com a largura configurada do aparelho, e falha em 921px contra 390px sem a correção. Um contorno no próprio teste, escrito na época com um diagnóstico errado, também foi removido: o botão fixo "Confirmar" voltou a ser clicado com um clique real.
+
 ## O que não foi construído
 
 Sem pagamento, sem lembrete por e-mail ou SMS, sem múltiplos profissionais por barbearia (um tenant é uma agenda), sem modo claro — a interface é escura, ponto (`color-scheme: dark` fixo em `globals.css`, sem media query de preferência de tema).
