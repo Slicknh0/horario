@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
-import { messageFor } from '@/lib/errors'
+import { messageFor, messageForSignInError } from '@/lib/errors'
 
 // One click into the owner's half of the product — the agenda, the
 // paywall, the availability editors — with zero typing. `email`/`password`
@@ -32,15 +32,15 @@ export function DemoLoginButton({
         password,
       })
       if (signInError) {
-        // Should not happen against a seeded, always-valid demo account —
-        // handled anyway rather than left to throw, since this is the one
-        // login a stranger with no context is expected to trust on a click.
-        setError(messageFor('INVALID_CREDENTIALS'))
+        // The demo credentials are always valid, so a failure here is almost
+        // never the password — it was a rejected origin the first time it
+        // happened, reported as "E-mail ou senha incorretos".
+        setError(messageForSignInError(signInError))
         return
       }
       router.push('/app')
     } catch {
-      setError(messageFor('INVALID_CREDENTIALS'))
+      setError(messageFor('UNEXPECTED_ERROR'))
     } finally {
       setPending(false)
     }

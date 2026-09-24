@@ -12,10 +12,9 @@ export type UiError =
   | 'VALIDATION_ERROR'
   | 'RANGE_INVALID'
   | 'RANGE_OVERLAP'
-  // A rejected sign-in (unknown e-mail or wrong password) and a thrown
-  // failure (network error, etc.) both land here — same code, same
-  // message, on purpose: the login form must never reveal which e-mails
-  // have accounts.
+  // A rejected sign-in: unknown e-mail and wrong password share this one
+  // message, so the login form never reveals which e-mails have accounts.
+  // Only the credentials code maps here — see messageForSignInError.
   | 'INVALID_CREDENTIALS'
   // Not a domain code: this is what a component shows when an action's
   // result carries `serverError` (a thrown/unrecognized failure — a bug, a
@@ -50,4 +49,19 @@ const MESSAGES: Record<UiError, string> = {
 
 export function messageFor(error: UiError): string {
   return MESSAGES[error]
+}
+
+// better-auth answers an unknown e-mail and a wrong password identically
+// (HTTP 401, INVALID_EMAIL_OR_PASSWORD), so naming that single code reveals
+// nothing about which accounts exist. Every other failure — a rejected
+// origin, rate limiting, a server fault — is not about the user's
+// credentials and must not be reported as if it were.
+export function messageForSignInError(
+  error: { code?: string } | null | undefined,
+): string {
+  return messageFor(
+    error?.code === 'INVALID_EMAIL_OR_PASSWORD'
+      ? 'INVALID_CREDENTIALS'
+      : 'UNEXPECTED_ERROR',
+  )
 }

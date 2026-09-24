@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
-import { messageFor } from '@/lib/errors'
+import { messageFor, messageForSignInError } from '@/lib/errors'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -38,18 +38,17 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        // Same message for an unknown e-mail and a wrong password: the form
-        // must never reveal which e-mails have accounts.
-        setError(messageFor('INVALID_CREDENTIALS'))
+        // Unknown e-mail and wrong password share one message; anything
+        // else is not the user's password and is not reported as such.
+        setError(messageForSignInError(signInError))
         return
       }
 
       router.push('/app')
     } catch {
-      // A thrown error (network failure, etc.) gets the same generic
-      // message as a rejected sign-in — it must never distinguish itself
-      // from a wrong e-mail or password.
-      setError(messageFor('INVALID_CREDENTIALS'))
+      // A thrown error (network failure) happens whether or not the account
+      // exists, so reporting it honestly reveals nothing about accounts.
+      setError(messageFor('UNEXPECTED_ERROR'))
     } finally {
       setPending(false)
     }
