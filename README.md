@@ -10,10 +10,10 @@ Next.js 16.3.5 (App Router), React 19, TypeScript em modo strict, Drizzle ORM so
 
 ## Testes
 
-130 testes unitários/integração e 3 testes de ponta a ponta, todos passando:
+143 testes unitários/integração e 3 testes de ponta a ponta, todos passando:
 
 ```bash
-pnpm test       # 130 testes, ~19s, roda contra PGlite — sem Postgres, sem Docker
+pnpm test       # 143 testes, ~19s, roda contra PGlite — sem Postgres, sem Docker
 pnpm test:e2e   # 3 testes, sobe o Next real + browser real sobre um PGlite descartável
 ```
 
@@ -55,7 +55,7 @@ Cada par de cores do design system (texto sobre fundo, botão, estado de erro) �
 
 Quatro suítes derivavam a data de `new Date()` no momento da carga do módulo ou do teste e assumiam que isso seria seguro para sempre. Um teste que caminhava até "a próxima segunda-feira" nunca avançava quando hoje já era segunda, então rodar depois das 18h (quando o expediente fecha) zerava os horários disponíveis e a asserção falhava. Outras três suítes derivavam agendamentos futuros por offset em minutos a partir de um `NOW` capturado uma vez; rodando tarde o suficiente no dia, `NOW + offset` cruzava a meia-noite local e caía na guarda de minuto inválido do domínio. A correção fixou o relógio com `vi.useFakeTimers()`/`vi.setSystemTime()` em vez de tentar calcular datas relativas "seguras". Uma suíte que falha só depois das 17h30 é pior do que nenhuma suíte, porque o time aprende a ignorar o vermelho.
 
-## O que a suíte de ponta a ponta encontrou que 130 testes verdes não encontraram
+## O que a suíte de ponta a ponta encontrou que os testes unitários, todos verdes, não encontraram
 
 Testes unitários e de integração provam que cada peça funciona isolada. O que eles não provam é que as peças se encaixam pelo caminho real — navegador de verdade, servidor de verdade, uma requisição HTTP de cada vez. Foi exatamente aí que a suíte Playwright ganhou o espaço no repositório:
 
@@ -83,7 +83,7 @@ pnpm install
 Os testes automatizados não exigem Postgres nem Docker — rodam contra PGlite (Postgres compilado para WASM), o mesmo caminho que o CI usa:
 
 ```bash
-pnpm test        # 130 testes unitários/integração
+pnpm test        # 143 testes unitários/integração
 pnpm test:e2e    # 3 testes de ponta a ponta (Next real + browser real)
 pnpm typecheck
 pnpm lint
