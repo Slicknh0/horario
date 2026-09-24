@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test'
 // Side effect: loads .env (or falls back to CI's job env) and forces
 // DATABASE_DRIVER=pglite / PGLITE_DATA_DIR / DISABLE_EMAIL_SEND for this
 // process and everything it spawns — see tests/e2e/env.ts.
-import './tests/e2e/env'
+import { E2E_BASE_URL } from './tests/e2e/env'
 
 // Every env var this process holds (including the three env.ts just set)
 // gets forwarded to the webServer command — see tests/e2e/prepare-and-start.ts,
@@ -25,7 +25,7 @@ export default defineConfig({
   // which matters far more here than wall-clock speed.
   workers: 1,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: E2E_BASE_URL,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
@@ -67,7 +67,7 @@ export default defineConfig({
     // see the comment there), then execs the long-lived `next start`
     // this webServer entry is nominally "starting".
     command: 'pnpm exec tsx tests/e2e/prepare-and-start.ts',
-    url: 'http://localhost:3000',
+    url: E2E_BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
     env: stringEnv(),

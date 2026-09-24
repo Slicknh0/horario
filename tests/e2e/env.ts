@@ -18,6 +18,11 @@ import path from 'node:path'
 
 export const E2E_PGLITE_DIR = path.resolve(process.cwd(), '.data/e2e-pglite')
 
+// The one address the suite drives the app through. playwright.config.ts
+// reads it too, so the browser's origin and the app's own idea of where it
+// lives cannot drift apart.
+export const E2E_BASE_URL = 'http://localhost:3000'
+
 try {
   process.loadEnvFile('.env')
 } catch {
@@ -25,6 +30,13 @@ try {
   // directly as job env — see .github/workflows/ci.yml.
 }
 
+// Pinned rather than inherited from .env: better-auth rejects a sign-in
+// whose Origin differs from BETTER_AUTH_URL, so a developer whose .env points
+// elsewhere (a LAN IP, to open the app on a phone) otherwise sees the login
+// spec fail for a reason unrelated to the code. NEXT_PUBLIC_APP_URL is
+// inlined at build time into the management link, so it is pinned too.
+process.env.BETTER_AUTH_URL = E2E_BASE_URL
+process.env.NEXT_PUBLIC_APP_URL = E2E_BASE_URL
 process.env.DATABASE_DRIVER = 'pglite'
 process.env.PGLITE_DATA_DIR = E2E_PGLITE_DIR
 process.env.DISABLE_EMAIL_SEND = 'true'
