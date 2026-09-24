@@ -93,12 +93,20 @@ pnpm build
 Para rodar o app de verdade com `pnpm dev`, é preciso um Postgres real. O repositório inclui um `docker-compose.yml` para quem tem Docker disponível:
 
 ```bash
-# com Docker disponível:
+cp .env.example .env   # os scripts abaixo leem o .env automaticamente
+
+# Opção A — Docker:
 docker compose up -d
 
-# sem Docker: aponte DATABASE_URL em .env (a partir de .env.example) para
-# um Postgres remoto (Neon, Supabase, Railway, RDS — qualquer um serve, o
-# driver padrão é postgres-js puro)
+# Opção B — Postgres instalado na máquina (testado com o 18): crie a role e o
+# banco que o .env.example espera, como superusuário:
+#   CREATE ROLE horario LOGIN PASSWORD 'horario';
+#   CREATE DATABASE horario OWNER horario;
+# A extensão btree_gist, que a constraint de sobreposição usa, já vem nos
+# instaladores oficiais e é "trusted" — o dono do banco consegue criá-la.
+
+# Opção C — Postgres remoto (Neon, Supabase, Railway, RDS): aponte
+# DATABASE_URL no .env para ele.
 
 pnpm db:migrate
 pnpm seed
